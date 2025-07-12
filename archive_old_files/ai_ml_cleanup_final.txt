@@ -1,0 +1,39 @@
+=== AI & ML Comprehensive Cleanup Report ===
+Date: Sun Jun 22 18:31:49 PKT 2025
+
+📁 /Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud/🤖 AI & ML:
+   Agents: 11 files
+   Agents_backup_20250622_183001: 15 files
+   Emergence_of_ Language_Developing _Brain: 1 files
+   Learning_Optimal_Redistribution_Mechanisms_Neural_Networks: 1 files
+   LLMs: 1 files
+   Meta_Learning_Neural_Mechanisms_rather_than_Bayesian_Priors: 1 files
+   The_little_book_of_deep_learning: 1 files
+
+📁 /Users/moatasimfarooque/Downloads/Data_Science/Sync_GoogleDrive/🤖 AI & ML:
+   Agents: 11 files
+   Agents_backup_20250622_183001: 15 files
+   Emergence_of_ Language_Developing _Brain: 1 files
+   Learning_Optimal_Redistribution_Mechanisms_Neural_Networks: 1 files
+   LLMs: 1 files
+   Meta_Learning_Neural_Mechanisms_rather_than_Bayesian_Priors: 1 files
+   The_little_book_of_deep_learning: 1 files
+
+📁 /Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync/🤖 AI & ML:
+   Agents: 11 files
+   Agents_backup_20250622_183001: 15 files
+   Emergence_of_ Language_Developing _Brain: 1 files
+   Learning_Optimal_Redistribution_Mechanisms_Neural_Networks: 1 files
+   LLMs: 1 files
+   Meta_Learning_Neural_Mechanisms_rather_than_Bayesian_Priors: 1 files
+   The_little_book_of_deep_learning: 1 files
+
+📁 /Users/moatasimfarooque/Library/CloudStorage/GoogleDrive-moatasim23android@gmail.com/My Drive/Sync/🤖 AI & ML:
+   Agents: 11 files
+   Agents_backup_20250622_183001: 15 files
+   Emergence_of_ Language_Developing _Brain: 1 files
+   Learning_Optimal_Redistribution_Mechanisms_Neural_Networks: 1 files
+   LLMs: 1 files
+   Meta_Learning_Neural_Mechanisms_rather_than_Bayesian_Priors: 1 files
+   The_little_book_of_deep_learning: 1 files
+

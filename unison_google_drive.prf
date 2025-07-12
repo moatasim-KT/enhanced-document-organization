@@ -1,0 +1,104 @@
+root = /Users/moatasimfarooque/Downloads/Data_Science/Sync/
+root = /Users/moatasimfarooque/gdrive_sync
+
+# Unison options
+auto = true
+batch = true
+prefer = newer
+log = true
+
+# Conflict resolution
+backup = Name *
+backupcurr = Name *
+backupnot = Name *.tmp
+maxbackups = 5
+
+# Ignore patterns to avoid deadlocks
+ignore = Name .DS_Store
+ignore = Name .localized
+ignore = Name .Spotlight-V100
+ignore = Name .Trashes
+ignore = Name .fseventsd
+ignore = Name .TemporaryItems
+ignore = Name *.tmp
+ignore = Name *.swp
+ignore = Name *~
+ignore = Name .#*
+ignore = Name #*#
+
+# Ignore Google Drive sync files
+ignore = Name *.gdoc
+ignore = Name *.gsheet
+ignore = Name *.gslides
+ignore = Name .tmp.driveupload
+ignore = Name .tmp.drivedownload
+
+# Enhanced ignore patterns for problematic files
+ignore = Regex .*:.*
+ignore = Regex .*".*
+ignore = Regex .*<.*
+ignore = Regex .*>.*
+ignore = Regex .*\|.*
+ignore = Name *.lock
+ignore = Name *.lnk
+ignore = Name desktop.ini
+ignore = Name Thumbs.db
+ignore = Name .dropbox*
+ignore = Name .sync*
+ignore = Name *conflicted copy*
+ignore = Name *conflict*
+
+# Performance and reliability settings
+retry = 3
+confirmbigdel = false
+fastcheck = true
+times = true
+perms = 0o644
+
+# Performance optimizations for large datasets
+maxthreads = 4
+rsrc = false
+copythreshold = 1000
+
+# Exclude large file types that slow down sync
+ignore = Name *.pdf
+ignore = Name *.PNG
+ignore = Name *.png
+ignore = Name *.jpg
+ignore = Name *.jpeg
+ignore = Name *.mp4
+ignore = Name *.mov
+ignore = Name *.epub
+ignore = Name *.zip
+ignore = Name *.tar.gz
+ignore = Name *.dmg
+
+# Exclude common large directories
+ignore = Path converted_images
+ignore = Path */converted_images
+ignore = Path random_forest_images
+ignore = Path */random_forest_images
+ignore = Path extracted_images
+ignore = Path */extracted_images
+ignore = Path images
+ignore = Path */images
+ignore = Path media
+ignore = Path */media
+
+# Exclude temporary and cache directories
+ignore = Path .obsidian/plugins/*/
+ignore = Path .smart-env
+ignore = Path */cache
+ignore = Path */temp
+ignore = Path */tmp
+
+# Network optimization
+# servercmd = timeout 60s unison  # Disabled - causes syntax issues
+# clientHostName = localhost
+
+# Backup and versioning
+backup = Name *
+backupcurr = Name *
+maxbackups = 3
+backupnot = Name *.tmp
+backupnot = Name *.lock
