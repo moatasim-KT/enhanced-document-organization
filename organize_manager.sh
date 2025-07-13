@@ -276,7 +276,7 @@ create_backup() {
     
     load_config
     
-    local backup_dir="/Users/moatasimfarooque/Downloads/Data_Science/Manual_Backup_$(date +%Y%m%d_%H%M%S)"
+    local backup_dir="${MANUAL_BACKUP_BASE:-$HOME/Downloads/Data_Science}/Manual_Backup_$(date +%Y%m%d_%H%M%S)"
     
     echo -e "${BLUE}Backing up to: $backup_dir${NC}"
     

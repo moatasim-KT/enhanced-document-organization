@@ -6,10 +6,20 @@
 
 set -euo pipefail
 
-# Configuration
-SCRIPT_DIR="/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync"
+# Configuration - Load from environment or use defaults
+USER_HOME="${HOME}"
+SCRIPT_DIR="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-export HOME="/Users/moatasimfarooque"
+export HOME="${USER_HOME}"
+
+# Load configuration if available
+if [ -f "$SCRIPT_DIR/config.env" ]; then
+    source "$SCRIPT_DIR/config.env"
+fi
+
+# Set default paths if not configured
+DATA_SCIENCE_ROOT="${DATA_SCIENCE_ROOT:-$USER_HOME/Downloads/Data_Science}"
+GOOGLE_DRIVE_EMAIL="${GOOGLE_DRIVE_EMAIL:-YOUR_EMAIL@gmail.com}"
 
 # Profile names (stored in ~/.unison/)
 ICLOUD_PROFILE="icloud"
@@ -20,8 +30,8 @@ MANAGER_LOG="$SCRIPT_DIR/sync_manager.log"
 HEALTH_REPORT="$SCRIPT_DIR/sync_health_report.txt"
 
 # Cloud paths
-ICLOUD_PATH="/Users/moatasimfarooque/icloud_sync"
-GDRIVE_PATH="/Users/moatasimfarooque/gdrive_sync"
+ICLOUD_PATH="${ICLOUD_PATH:-$USER_HOME/icloud_sync}"
+GDRIVE_PATH="${GDRIVE_PATH:-$USER_HOME/gdrive_sync}"
 
 # Timing and limits
 STAGGER_DELAY=300      # 5 minutes between syncs
@@ -987,7 +997,7 @@ analyze_trends() {
 
 # Check disk space and generate alerts
 check_disk_space() {
-    local sync_dir="/Users/moatasimfarooque/Downloads/Data_Science/Sync"
+    local sync_dir="${DATA_SCIENCE_ROOT}/Sync"
     local usage_percent=$(df "$sync_dir" | awk 'NR==2 {print $5}' | tr -d '%')
 
     if [ "$usage_percent" -gt "$DISK_SPACE_THRESHOLD" ]; then

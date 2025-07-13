@@ -1,52 +1,43 @@
-# Enhanced Document Organization MCP Server - Quick Setup Guide
+# 🚀 MCP Setup Guide
 
-## 🚀 What You've Built
+Quick setup guide for the Enhanced Document Organization MCP Server.
 
-You now have a **Model Context Protocol (MCP) server** that gives AI assistants powerful access to your enhanced document organization system! This server allows AI tools like Claude Desktop to:
+## ⚡ Quick Setup
 
-- 🔍 **Search** through your organized documents
-- 📖 **Read** document contents 
-- 🤖 **Organize** new documents automatically
-- 🔄 **Sync** across multiple platforms
-- 📊 **Analyze** your document collection
-- ✍️ **Create** new documents intelligently
-
-## ⚡ Quick Start
-
-### 1. Verify Setup
+### 1. **Run Setup Script**
 ```bash
-cd /Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync
-./mcp_manager.sh status
+./setup.sh
+```
+This configures paths for your system and creates the configuration file.
+
+### 2. **Test MCP Server**  
+```bash
+./mcp_manager.sh test
 ```
 
-### 2. Configure Claude Desktop
-Add this to your Claude Desktop configuration:
+### 3. **Configure Claude Desktop**
+The setup script creates the configuration automatically. If you need to add it manually:
 
-**File:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-
+**File**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 ```json
 {
   "mcpServers": {
     "enhanced-document-organization": {
       "command": "node",
-      "args": ["/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync/mcp-server/server.js"],
+      "args": ["${PROJECT_ROOT}/mcp-server/server.js"],
       "env": {}
     }
   }
 }
 ```
 
-### 3. Restart Claude Desktop
+### 4. **Restart Claude Desktop**
 
-After adding the configuration, restart Claude Desktop to load the MCP server.
-
-## 🎯 What You Can Do Now
-
-### Ask Claude to Search Your Documents
-> "Search for documents about machine learning transformers"
-
-### Have Claude Organize New Content
-> "Create a new document about GPT-4 architecture and organize it automatically"
+### 5. **Test with Claude**
+Ask Claude:
+- "Search for documents about machine learning"
+- "Show me my document categories"
+- "Create a new note about AI research"
 
 ### Get System Statistics  
 > "Show me statistics about my document organization system"

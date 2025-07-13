@@ -17,15 +17,20 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 
-// Configuration
+// Configuration - Load from environment variables or use defaults
+const USER_HOME = process.env.HOME || process.env.USERPROFILE;
+const DATA_SCIENCE_ROOT = process.env.DATA_SCIENCE_ROOT || `${USER_HOME}/Downloads/Data_Science`;
+const PROJECT_ROOT = process.env.PROJECT_ROOT || `${USER_HOME}/Downloads/Programming/CascadeProjects/Drive_sync`;
+const GOOGLE_DRIVE_EMAIL = process.env.GOOGLE_DRIVE_EMAIL || 'YOUR_EMAIL@gmail.com';
+
 const SYNC_DIRS = [
-  '/Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud',
-  '/Users/moatasimfarooque/Downloads/Data_Science/Sync_GoogleDrive',
-  '/Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync',
-  '/Users/moatasimfarooque/Library/CloudStorage/GoogleDrive-moatasim23android@gmail.com/My Drive/Sync'
+  process.env.SYNC_ICLOUD || `${DATA_SCIENCE_ROOT}/Sync_iCloud`,
+  process.env.SYNC_GDRIVE || `${DATA_SCIENCE_ROOT}/Sync_GoogleDrive`,
+  process.env.SYNC_OBSIDIAN || `${USER_HOME}/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync`,
+  process.env.SYNC_GDRIVE_CLOUD || `${USER_HOME}/Library/CloudStorage/GoogleDrive-${GOOGLE_DRIVE_EMAIL}/My Drive/Sync`
 ];
 
-const SCRIPT_DIR = '/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync';
+const SCRIPT_DIR = process.env.PROJECT_ROOT || PROJECT_ROOT;
 const PRIMARY_SYNC_DIR = SYNC_DIRS[0]; // Use iCloud as primary
 
 class DocumentOrganizationMCP {
