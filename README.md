@@ -1,6 +1,6 @@
-# 🚀 Enhanced Document Organization System
+# 🚀 Enhanced Document Organization System v2.0
 
-A comprehensive, intelligent document organization system with advanced features for content analysis, deduplication, and sync management.
+A comprehensive, intelligent document organization system with advanced features for content analysis, deduplication, sync management, and **Model Context Protocol (MCP) server** for AI assistant integration.
 
 ## 🌟 System Overview
 
@@ -11,271 +11,275 @@ This system provides:
 - **📊 Comprehensive Reporting**: Detailed statistics and progress tracking
 - **🛡️ Enhanced Safety**: Automatic backups and integrity checking
 - **🌐 Multi-location Sync**: Supports iCloud, Google Drive, and local folders
+- **🤖 MCP Server**: AI assistant integration for natural language document management
 
-## 📁 Essential Files
+## 🚀 Quick Start
+
+### 1. **Setup and Configuration**
+```bash
+# Clone the repository
+git clone https://github.com/moatasim-KT/enhanced-document-organization.git
+cd enhanced-document-organization
+
+# Run interactive setup (configures paths for your system)
+./setup.sh
+```
+
+### 2. **Test the System**
+```bash
+./mcp_manager.sh test          # Test MCP server
+./organize_manager.sh status   # Check organization system  
+./sync_manager.sh status       # Check sync system
+```
+
+### 3. **Run Organization**
+```bash
+./organize_manager.sh run      # Organize documents with smart categorization
+```
+
+### 4. **Use with AI Assistants (Optional)**
+- The setup creates configuration for Claude Desktop
+- Restart Claude Desktop to use MCP tools
+- Ask Claude to search, organize, or manage your documents
+
+## 📁 System Components
 
 ### 🔧 Core Scripts
 - **`organize_documents_enhanced.sh`** - Main enhanced organization script
 - **`organize_manager.sh`** - Management utility with command interface
 - **`sync_manager.sh`** - Sync management (if using Unison)
+- **`mcp_manager.sh`** - MCP server management
+- **`setup.sh`** - Interactive system configuration
 
 ### ⚙️ Configuration
 - **`organize_config.conf`** - Comprehensive configuration file
+- **`config.env.example`** - Environment configuration template
+- **`config.env`** - Your custom configuration (created by setup.sh)
 - **`unison_*.prf`** - Unison profiles (if using Unison sync)
+
+### 🤖 MCP Server
+- **`mcp-server/server.js`** - Model Context Protocol server
+- **`mcp-server/package.json`** - Node.js dependencies
+- **`mcp-server/README.md`** - Detailed MCP documentation
 
 ### 📖 Documentation
 - **`README.md`** - This file with complete system documentation
+- **`MCP_SETUP_GUIDE.md`** - Quick MCP setup guide
 
-## 🚀 Quick Start
+## 🛠️ Configuration System
 
-### 1. Check System Status
+The system uses environment variables for configuration, making it portable across different users and systems.
+
+### Default Paths (Configurable)
 ```bash
-# Check system health and configuration
-./organize_manager.sh status
+# Project paths
+PROJECT_ROOT="${HOME}/Downloads/Programming/CascadeProjects/Drive_sync"
+DATA_SCIENCE_ROOT="${HOME}/Downloads/Data_Science"
+
+# Sync directories  
+SYNC_ICLOUD="${DATA_SCIENCE_ROOT}/Sync_iCloud"
+SYNC_GDRIVE="${DATA_SCIENCE_ROOT}/Sync_GoogleDrive"
+SYNC_OBSIDIAN="${HOME}/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync"
+SYNC_GDRIVE_CLOUD="${HOME}/Library/CloudStorage/GoogleDrive-${GOOGLE_DRIVE_EMAIL}/My Drive/Sync"
 ```
 
-### 2. Test Run (Safe)
+### Manual Configuration
+If you prefer manual setup, copy and customize:
 ```bash
-# Run without making changes to test the system
-./organize_manager.sh dry-run
+cp config.env.example config.env
+# Edit config.env with your paths and email
 ```
 
-### 3. Full Organization
+## 📂 Document Categories
+
+The system intelligently organizes documents into these categories:
+
+### 🤖 **AI & ML**
+- **Agents**: AI agent development and research
+- **LLMs**: Large Language Models and transformers  
+- **Computer_Vision**: Image processing and analysis
+- **NLP**: Natural Language Processing
+- **Neural_Networks**: Deep learning architectures
+- **Reinforcement_Learning**: RL algorithms and applications
+- **MLOps**: Machine Learning operations and deployment
+
+### 📚 **Research Papers**
+- **AI_ML**: Artificial Intelligence and Machine Learning
+- **Physics**: Physics research and papers
+- **Neuroscience**: Brain science and cognitive research
+- **Mathematics**: Mathematical research and proofs
+- **Computer_Science**: CS theory and algorithms
+- **Biology**: Life sciences and biotechnology
+
+### 💻 **Development**
+- **Tools_Frameworks**: Development tools and frameworks
+- **APIs**: API documentation and references
+- **Kubernetes**: Container orchestration
+- **Git**: Version control and workflows
+- **Documentation**: Technical documentation
+- **Databases**: Database design and queries
+- **Frontend**: Web frontend development
+- **Backend**: Server-side development
+- **DevOps**: Development operations and CI/CD
+
+### 🌐 **Web Content**
+- **Articles**: Web articles and blog posts
+- **Tutorials**: How-to guides and tutorials
+- **Guides**: Step-by-step instructions
+- **News**: Technology news and updates
+- **Netclips**: Web clips and bookmarks
+
+### 📝 **Notes & Drafts**
+- **Daily_Notes**: Daily journaling and notes
+- **Literature_Notes**: Research literature notes
+- **Meeting_Notes**: Meeting minutes and summaries
+- **Ideas**: Brainstorming and concept notes
+- **Untitled**: Uncategorized draft documents
+
+### 🔬 **Projects**
+- **Active**: Currently active projects
+- **Completed**: Finished projects
+- **Ideas**: Project ideas and proposals
+
+### 📊 **Data**
+- **Datasets**: Data files and collections
+- **Analysis**: Data analysis results
+- **Visualizations**: Charts, graphs, and plots
+
+## ⚡ Management Commands
+
+### 📋 Organization Management
 ```bash
-# Run the enhanced organization system
-./organize_manager.sh run
+./organize_manager.sh run       # Run full organization
+./organize_manager.sh dry-run   # Preview changes
+./organize_manager.sh status    # System status
+./organize_manager.sh stats     # View statistics
+./organize_manager.sh backup    # Create manual backup
+./organize_manager.sh validate  # Validate organization
 ```
 
-### 4. View Results
+### 🔄 Sync Management  
 ```bash
-# Show processing statistics
-./organize_manager.sh stats
+./sync_manager.sh sync          # Run synchronization
+./sync_manager.sh status        # Check sync status
+./sync_manager.sh health        # Health monitoring
+./sync_manager.sh performance   # Performance metrics
 ```
 
-## 💡 Management Commands
-
+### 🤖 MCP Server Management
 ```bash
-./organize_manager.sh help          # Show all commands
-./organize_manager.sh config        # View configuration
-./organize_manager.sh validate      # Check sync consistency
-./organize_manager.sh backup        # Create manual backup
-./organize_manager.sh clean         # Clean cache files
+./mcp_manager.sh status         # Check server readiness
+./mcp_manager.sh test           # Test functionality
+./mcp_manager.sh test-interactive # Interactive testing
+./mcp_manager.sh config         # Show configuration
+./mcp_manager.sh install        # Install dependencies
 ```
 
-## 🗂️ Smart Categorization
+## 🌟 AI Integration Features
 
-The system automatically organizes files into **47 specialized categories**:
+With the MCP server, you can use natural language to:
 
-### 📚 Research Papers
-- **AI_ML** - Machine learning research
-- **Physics** - Physics and quantum mechanics  
-- **Neuroscience** - Brain and cognitive science
-- **Mathematics** - Mathematical theorems and proofs
-- **Computer_Science** - General computer science
-- **Biology** - Biological and life sciences
+### 🔍 **Search Documents**
+- "Find all documents about machine learning transformers"
+- "Search for papers about neural networks in the AI category"
+- "Show me recent documents about kubernetes"
 
-### 🤖 AI & ML
-- **Agents** - AI agents and autonomous systems
-- **LLMs** - Large language models (GPT, Claude, etc.)
-- **Computer_Vision** - Image and video processing
-- **NLP** - Natural language processing
-- **Neural_Networks** - Network architectures
-- **Transformers** - Attention mechanisms
-- **Reinforcement_Learning** - RL algorithms
-- **MLOps** - ML operations and deployment
-- **Tools_Frameworks** - ML tools and libraries
+### 📖 **Read Content**
+- "Get the content of the GPT-4 architecture document"
+- "Show me the full text of documents about reinforcement learning"
 
-### 💻 Development
-- **APIs** - REST, GraphQL, microservices
-- **Kubernetes** - Container orchestration
-- **Git** - Version control
-- **Documentation** - Technical docs
-- **Databases** - Database design
-- **Frontend** - UI/UX development
-- **Backend** - Server-side development
-- **DevOps** - CI/CD and infrastructure
+### 🤖 **Organize Documents**
+- "Organize all my documents automatically"
+- "Run organization in dry-run mode to preview changes"
 
-### 🌐 Web Content
-- **Articles** - Web articles and blog posts
-- **Tutorials** - How-to guides
-- **Guides** - Reference materials
-- **News** - News articles and updates
-- **Netclips** - Web clips and bookmarks
+### ✍️ **Create Documents**
+- "Create a new research note about transformer attention mechanisms"
+- "Add a document about Docker containerization to the DevOps category"
 
-### 📝 Notes & Drafts
-- **Daily_Notes** - Daily journal entries
-- **Literature_Notes** - Book and paper notes
-- **Meeting_Notes** - Meeting minutes
-- **Ideas** - Brainstorming and concepts
-- **Untitled** - Draft documents
+### 📊 **Get Statistics**
+- "Show me statistics about my document collection"
+- "How many documents do I have in each category?"
 
-### 🔬 Projects, 📊 Data, 🗄️ Archives
-- Various project, data analysis, and archival categories
+## 🔧 Advanced Features
 
-## 🧠 Intelligent Features
+### 📈 **Performance Optimization**
+- **Incremental Processing**: Only processes changed files
+- **Content Hashing**: Efficient duplicate detection
+- **Parallel Processing**: Multi-threaded operations
+- **Memory Management**: Optimized for large collections
 
-### Content-Based Categorization
-The system analyzes file content to determine the best category:
-- **AI/ML Detection**: Recognizes ML frameworks, model names, techniques
-- **Research Papers**: Identifies academic structure and subject matter
-- **Development Content**: Detects programming languages, frameworks, tools
-- **Web Content**: Distinguishes articles, tutorials, and guides
+### 🛡️ **Safety & Reliability**
+- **Automatic Backups**: Before each organization run
+- **Integrity Checking**: Validates file operations
+- **Error Recovery**: Robust error handling
+- **Dry-run Mode**: Preview changes before applying
 
-### Advanced Deduplication
-- **Content Hashing**: SHA-256 based duplicate detection
-- **Best Version Selection**: Keeps newest/largest version automatically
-- **Safe Archiving**: Moves duplicates to archive instead of deleting
+### 📊 **Monitoring & Analytics**
+- **Comprehensive Logging**: Detailed operation logs
+- **Performance Metrics**: Processing time and throughput
+- **Health Monitoring**: System status checks
+- **Statistical Reports**: Organization insights
 
-### Incremental Processing
-- **Change Detection**: Only processes files modified since last run
-- **Performance Optimization**: Up to 90% faster processing
-- **Smart Caching**: Maintains processing history and content hashes
+## 🚀 Automation
 
-## 📊 Configuration Options
-
-Edit `organize_config.conf` to customize:
+### Automated Sync (Optional)
+The system can be configured for automatic synchronization:
 
 ```bash
-# Feature toggles
-ENABLE_SMART_CATEGORIZATION=true
-ENABLE_INCREMENTAL_PROCESSING=true
-ENABLE_ADVANCED_DEDUPLICATION=true
+# Add to crontab for automated sync every 30 minutes
+*/30 * * * * /path/to/sync_manager.sh sync
 
-# Processing parameters
-MIN_FILE_SIZE=10                    # Minimum file size in bytes
-MAX_FILENAME_LENGTH=80              # Warn about long filenames
-INCREMENTAL_THRESHOLD=3600          # Process files changed within 1 hour
+# Health monitoring every hour  
+15 * * * * /path/to/sync_manager.sh health
 ```
 
-## 🔄 Sync Locations
+### Background Processing
+- Documents are organized automatically when added to sync folders
+- Cross-platform synchronization happens transparently
+- AI categorization runs without user intervention
 
-The system works with multiple sync locations:
-- **iCloud**: `/Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud`
-- **Google Drive**: `/Users/moatasimfarooque/Downloads/Data_Science/Sync_GoogleDrive`
-- **Obsidian**: `/Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync`
-- **Cloud Storage**: `/Users/moatasimfarooque/Library/CloudStorage/GoogleDrive-.../My Drive/Sync`
-
-## 🛡️ Safety Features
-
-### Automatic Backups
-- **Timestamped backups** created before each run
-- **Easy restoration** from any backup
-- **Configurable retention** policy
-
-### Data Integrity
-- **File validation** before processing
-- **Encoding checks** for text files
-- **Corruption detection** and quarantine
-- **Metadata preservation** during moves
-
-### Error Recovery
-- **Comprehensive logging** for troubleshooting
-- **Graceful degradation** on partial failures
-- **Manual intervention** options when needed
-
-## 📈 Performance & Monitoring
-
-### Processing Statistics
-- Files processed, moved, and categorized
-- Duplicate detection and removal counts
-- Processing time and throughput metrics
-- Error rates and success percentages
-
-### Reports Generated
-- **JSON format** for programmatic analysis
-- **Markdown format** for human readability
-- **Sync consistency** validation reports
-- **Historical comparison** data
-
-## 🚨 Troubleshooting
+## 🔍 Troubleshooting
 
 ### Common Issues
 
-**Files not categorizing correctly:**
-```bash
-# Check content analysis in config
-nano organize_config.conf
-# Increase CONTENT_ANALYSIS_DEPTH if needed
-```
+1. **Permission Errors**: Ensure read/write access to all sync directories
+2. **Node.js Missing**: Install Node.js 18+ for MCP server functionality
+3. **Sync Conflicts**: Use force mode or check sync validation settings
+4. **Missing Directories**: Run `./setup.sh` to create required directories
 
-**Sync inconsistencies:**
+### Debug Mode
 ```bash
-# Run validation
+# Enable verbose output
+export VERBOSE_OUTPUT="true"
+./organize_manager.sh run
+
+# Check system status
 ./organize_manager.sh validate
-# Check sync locations accessibility
 ```
 
-**Performance issues:**
-```bash
-# Enable incremental processing
-# Clean cache regularly
-./organize_manager.sh clean
-```
+### Log Files
+- **Sync logs**: `sync_manager.log`
+- **Performance logs**: `performance.log`  
+- **MCP server logs**: `mcp-server/server.log`
 
-### System Health
-```bash
-# Check status
-./organize_manager.sh status
+## 📄 License
 
-# View configuration
-./organize_manager.sh config
+MIT License - Feel free to use, modify, and distribute.
 
-# Check logs (auto-created)
-tail -f organization.log
-```
+## 🤝 Contributing
 
-## 🔧 Advanced Usage
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
-### Custom Categorization
-Add custom patterns to `organize_config.conf`:
-```bash
-# Add your own keyword patterns
-CUSTOM_KEYWORDS=(
-    "your_pattern|another_pattern"
-)
-```
+## 🆘 Support
 
-### Batch Processing
-```bash
-# Process multiple directories
-for dir in /path/to/dir1 /path/to/dir2; do
-    SOURCE_DIR="$dir" ./organize_manager.sh run
-done
-```
-
-### Integration with Cron
-```bash
-# Add to crontab for regular organization
-crontab -e
-# Add: 0 2 * * * /path/to/organize_manager.sh run >/dev/null 2>&1
-```
-
-## 📋 System Requirements
-
-- **OS**: macOS (tested on macOS 14+)
-- **Shell**: bash/zsh
-- **Disk Space**: 1GB+ free for processing
-- **Memory**: 512MB+ available
-- **Permissions**: Read/write access to sync directories
-
-## 🔮 Future Enhancements
-
-The system is designed for extensibility:
-- Machine learning models for better categorization
-- API integration with note-taking apps
-- Web dashboard for remote monitoring
-- Mobile app for on-the-go management
+- **Documentation**: Check `mcp-server/README.md` for detailed MCP information
+- **Issues**: Report bugs and feature requests on GitHub
+- **Configuration**: Use `./setup.sh` for interactive configuration help
 
 ---
 
-## 📞 Support
-
-For issues:
-1. Run `./organize_manager.sh status` to check system health
-2. Check the configuration with `./organize_manager.sh config`
-3. Review logs for error messages
-4. Verify directory permissions and accessibility
-
----
-
-*Enhanced Document Organization System - Your documents, perfectly organized, automatically.*
+**Made with ❤️ for intelligent document organization and AI integration**

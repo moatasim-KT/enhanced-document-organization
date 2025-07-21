@@ -6,8 +6,19 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MCP_DIR="$SCRIPT_DIR/mcp-server"
-SERVER_SCRIPT="$MCP_DIR/server.js"
+
+# Load configuration if available
+if [ -f "$SCRIPT_DIR/config.env" ]; then
+    source "$SCRIPT_DIR/config.env"
+fi
+
+# Set default paths
+USER_HOME="${HOME}"
+PROJECT_ROOT="${PROJECT_ROOT:-$SCRIPT_DIR}"
+DATA_SCIENCE_ROOT="${DATA_SCIENCE_ROOT:-$USER_HOME/Downloads/Data_Science}"
+
+MCP_DIR="${MCP_WORKING_DIR:-$PROJECT_ROOT/mcp-server}"
+SERVER_SCRIPT="${MCP_SERVER_PATH:-$MCP_DIR/server.js}"
 PID_FILE="$MCP_DIR/.server.pid"
 LOG_FILE="$MCP_DIR/server.log"
 
@@ -200,7 +211,7 @@ test_server() {
     local total_dirs=0
     
     # Test primary sync directory access
-    if [ -d "/Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud" ]; then
+    if [ -d "${SYNC_ICLOUD:-$DATA_SCIENCE_ROOT/Sync_iCloud}" ]; then
         success "iCloud sync directory accessible"
         ((accessible_dirs++))
     else
@@ -208,7 +219,7 @@ test_server() {
     fi
     ((total_dirs++))
     
-    if [ -d "/Users/moatasimfarooque/Downloads/Data_Science/Sync_GoogleDrive" ]; then
+    if [ -d "${SYNC_GDRIVE:-$DATA_SCIENCE_ROOT/Sync_GoogleDrive}" ]; then
         success "Google Drive sync directory accessible"
         ((accessible_dirs++))
     else

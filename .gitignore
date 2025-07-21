@@ -1,6 +1,5 @@
 # Personal configuration
 config.env
-.git
 # Logs
 *.log
 sync_manager.log

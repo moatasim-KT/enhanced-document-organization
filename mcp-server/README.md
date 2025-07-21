@@ -91,7 +91,7 @@ Create a new document with intelligent placement.
 
 1. **Navigate to the MCP server directory:**
    ```bash
-   cd /Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync/mcp-server
+   cd ${PROJECT_ROOT}/mcp-server
    ```
 
 2. **Install dependencies:**
@@ -115,7 +115,7 @@ Add this to your Claude Desktop configuration (`~/Library/Application Support/Cl
   "mcpServers": {
     "enhanced-document-organization": {
       "command": "node",
-      "args": ["/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync/mcp-server/server.js"],
+      "args": ["${PROJECT_ROOT}/mcp-server/server.js"],
       "env": {}
     }
   }
@@ -126,7 +126,7 @@ Add this to your Claude Desktop configuration (`~/Library/Application Support/Cl
 
 Use the standard MCP connection format:
 - **Command**: `node`
-- **Args**: `["/path/to/server.js"]`
+- **Args**: `["${PROJECT_ROOT}/mcp-server/server.js"]`
 - **Protocol**: stdio
 
 ## Document Categories
@@ -155,10 +155,10 @@ The server recognizes these intelligent categories:
 
 The server manages documents across these synchronized locations:
 
-1. **iCloud Drive**: `/Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud`
-2. **Google Drive**: `/Users/moatasimfarooque/Downloads/Data_Science/Sync_GoogleDrive`
-3. **Obsidian Vault**: `/Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync`
-4. **Google Drive Cloud**: `/Users/moatasimfarooque/Library/CloudStorage/GoogleDrive-moatasim23android@gmail.com/My Drive/Sync`
+1. **iCloud Drive**: `${DATA_SCIENCE_ROOT}/Sync_iCloud`
+2. **Google Drive**: `${DATA_SCIENCE_ROOT}/Sync_GoogleDrive`
+3. **Obsidian Vault**: `${HOME}/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync`
+4. **Google Drive Cloud**: `${HOME}/Library/CloudStorage/GoogleDrive-${GOOGLE_DRIVE_EMAIL}/My Drive/Sync`
 
 ## Example Interactions
 
@@ -233,8 +233,8 @@ npm run dev
 
 ### Log Files
 Check these locations for detailed logs:
-- `/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync/sync_manager.log`
-- `/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync/performance.log`
+- `${PROJECT_ROOT}/sync_manager.log`
+- `${PROJECT_ROOT}/performance.log`
 
 ## API Reference
 
