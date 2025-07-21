@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.moatasim.enhanced-document-organization</string>
+    
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync/run_automation.sh</string>
+    </array>
+    
+    <!-- Run every 30 minutes (1800 seconds) for optimal balance -->
+    <key>StartInterval</key>
+    <integer>1800</integer>
+    
+    <!-- Run at system startup/login -->
+    <key>RunAtLoad</key>
+    <true/>
+    
+    <!-- Keep the job alive if it exits -->
+    <key>KeepAlive</key>
+    <false/>
+    
+    <!-- Don't run if the system is on battery and battery is low -->
+    <key>OnDemand</key>
+    <false/>
+    
+    <!-- Environment variables -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+        <key>HOME</key>
+        <string>/Users/moatasimfarooque</string>
+    </dict>
+    
+    <!-- Working directory -->
+    <key>WorkingDirectory</key>
+    <string>/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync</string>
+    
+    <!-- Logging -->
+    <key>StandardOutPath</key>
+    <string>/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync/launchd_out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync/launchd_err.log</string>
+    
+    <!-- Only run when user is logged in -->
+    <key>LimitLoadToSessionType</key>
+    <string>Aqua</string>
+    
+    <!-- Process type -->
+    <key>ProcessType</key>
+    <string>Background</string>
+    
+    <!-- Resource limits -->
+    <key>SoftResourceLimits</key>
+    <dict>
+        <key>NumberOfFiles</key>
+        <integer>1024</integer>
+    </dict>
+    
+    <!-- Nice value (lower priority) -->
+    <key>Nice</key>
+    <integer>10</integer>
+    
+    <!-- Throttle interval between restarts -->
+    <key>ThrottleInterval</key>
+    <integer>60</integer>
+</dict>
+</plist>

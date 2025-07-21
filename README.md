@@ -1,281 +1,313 @@
-# 🚀 Enhanced Document Organization System
+# Enhanced Document Organization System
 
-A comprehensive, intelligent document organization system with advanced features for content analysis, deduplication, and sync management.
+A comprehensive, intelligent document organization system with advanced reliability features for content analysis, synchronization across cloud services, and AI-powered assistance.
 
-## 🌟 System Overview
+## Overview
 
-This system provides:
-- **🧠 Smart Content Analysis**: Automatically categorizes files based on content
-- **🔄 Incremental Processing**: Only processes changed files for efficiency  
-- **🔍 Advanced Deduplication**: Content-hash based duplicate detection
-- **📊 Comprehensive Reporting**: Detailed statistics and progress tracking
-- **🛡️ Enhanced Safety**: Automatic backups and integrity checking
-- **🌐 Multi-location Sync**: Supports iCloud, Google Drive, and local folders
+This system provides automated organization and synchronization of documents across multiple cloud platforms (iCloud, Google Drive) with intelligent categorization, reliability enhancements, and AI integration through a Model Context Protocol (MCP) server.
 
-## 📁 Essential Files
+### Key Features
 
-### 🔧 Core Scripts
-- **`organize_documents_enhanced.sh`** - Main enhanced organization script
-- **`organize_manager.sh`** - Management utility with command interface
-- **`sync_manager.sh`** - Sync management (if using Unison)
+- **Smart Content Analysis**: Automatically categorizes files based on content
+- **Multi-Platform Sync**: Seamless synchronization across iCloud and Google Drive
+- **Enhanced Reliability**: Circuit breaker pattern, adaptive retry, and automated recovery
+- **AI Integration**: MCP server for AI assistants to manage documents intelligently
+- **Simplified Categories**: Option for 5 main categories or detailed 47+ category system
 
-### ⚙️ Configuration
-- **`organize_config.conf`** - Comprehensive configuration file
-- **`unison_*.prf`** - Unison profiles (if using Unison sync)
+## System Architecture
 
-### 📖 Documentation
-- **`README.md`** - This file with complete system documentation
-
-## 🚀 Quick Start
-
-### 1. Check System Status
-```bash
-# Check system health and configuration
-./organize_manager.sh status
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Document Organization                      │
+│                                                                 │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │Content Analysis │  │  Categorization │  │  Deduplication  │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
+│                                                                 │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      Sync Reliability Layer                     │
+│                                                                 │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │Error Classification│  │Adaptive Retry   │  │Circuit Breaker  │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
+│                                                                 │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │Recovery Engine  │  │Health Monitoring│  │Self-Healing     │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
+│                                                                 │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      Cloud Synchronization                      │
+│                                                                 │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │   iCloud Sync   │  │ Google Drive Sync│  │  Local Storage  │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
+│                                                                 │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        AI Integration                           │
+│                                                                 │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │   MCP Server    │  │Document Search  │  │Content Creation  │  │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### 2. Test Run (Safe)
-```bash
-# Run without making changes to test the system
-./organize_manager.sh dry-run
+## Project Structure
+
+```
+Drive_sync/
+├── drive_sync.sh              # Main entry point script
+├── config.env                 # Environment configuration
+├── organize_config.conf       # Organization settings
+├── README.md                  # This file
+│
+├── organize/                  # Organization module
+│   └── organize_module.sh     # Consolidated organization script
+│
+├── sync/                      # Sync module
+│   └── sync_module.sh         # Consolidated sync script
+│
+├── mcp/                       # MCP module
+│   ├── mcp_manager.sh         # MCP server management
+│   ├── server.js              # MCP server implementation
+│   └── package.json           # MCP server dependencies
+│
+├── tests/                     # Test scripts
+│   ├── test_category_patterns_simple.sh
+│   ├── test_recovery_action_registry.sh
+│   ├── test_recovery_engine.sh
+│   └── test_simplified_categorization.sh
+│
+└── .cache/                    # Processing cache
+    ├── processed_files.db     # Database of processed files
+    └── content_hashes.db      # Database of content hashes
 ```
 
-### 3. Full Organization
+## Installation
+
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd Drive_sync
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   # Install Unison for sync
+   brew install unison
+   
+   # Install Node.js for MCP server
+   brew install node
+   
+   # Install MCP server dependencies
+   cd mcp
+   npm install
+   cd ..
+   ```
+
+3. **Configure paths**:
+   Edit `config.env` to set your specific paths for iCloud, Google Drive, and local directories.
+
+4. **Set up sync profiles**:
+   ```bash
+   # Copy Unison profiles to ~/.unison/
+   cp unison_icloud.prf ~/.unison/icloud.prf
+   cp unison_google_drive.prf ~/.unison/google_drive.prf
+   ```
+
+5. **Set up automation** (optional):
+   ```bash
+   # Copy LaunchAgent plist to ~/Library/LaunchAgents/
+   cp com.moatasim.enhanced-document-organization.plist ~/Library/LaunchAgents/
+   
+   # Load the LaunchAgent
+   launchctl load ~/Library/LaunchAgents/com.moatasim.enhanced-document-organization.plist
+   ```
+
+## Usage
+
+### Main Command
+
 ```bash
-# Run the enhanced organization system
-./organize_manager.sh run
+# Show help
+./drive_sync.sh help
+
+# Run complete workflow (sync → organize → sync)
+./drive_sync.sh all
 ```
 
-### 4. View Results
-```bash
-# Show processing statistics
-./organize_manager.sh stats
-```
-
-## 💡 Management Commands
+### Document Organization
 
 ```bash
-./organize_manager.sh help          # Show all commands
-./organize_manager.sh config        # View configuration
-./organize_manager.sh validate      # Check sync consistency
-./organize_manager.sh backup        # Create manual backup
-./organize_manager.sh clean         # Clean cache files
+# Run document organization
+./drive_sync.sh organize run
+
+# Test organization without making changes
+./drive_sync.sh organize dry-run
+
+# Check organization status
+./drive_sync.sh organize status
+
+# Create a new custom category
+./drive_sync.sh organize create-category "Data Science" "📊" "data science,machine learning,statistics"
 ```
 
-## 🗂️ Smart Categorization
+### Sync Management
 
-The system automatically organizes files into **47 specialized categories**:
+```bash
+# Run sync process
+./drive_sync.sh sync sync
 
-### 📚 Research Papers
-- **AI_ML** - Machine learning research
-- **Physics** - Physics and quantum mechanics  
-- **Neuroscience** - Brain and cognitive science
-- **Mathematics** - Mathematical theorems and proofs
-- **Computer_Science** - General computer science
-- **Biology** - Biological and life sciences
+# Check sync health
+./drive_sync.sh sync health
 
-### 🤖 AI & ML
-- **Agents** - AI agents and autonomous systems
-- **LLMs** - Large language models (GPT, Claude, etc.)
-- **Computer_Vision** - Image and video processing
-- **NLP** - Natural language processing
-- **Neural_Networks** - Network architectures
-- **Transformers** - Attention mechanisms
-- **Reinforcement_Learning** - RL algorithms
-- **MLOps** - ML operations and deployment
-- **Tools_Frameworks** - ML tools and libraries
+# Reset circuit breakers
+./drive_sync.sh sync reset-circuit
 
-### 💻 Development
-- **APIs** - REST, GraphQL, microservices
-- **Kubernetes** - Container orchestration
-- **Git** - Version control
-- **Documentation** - Technical docs
-- **Databases** - Database design
-- **Frontend** - UI/UX development
-- **Backend** - Server-side development
-- **DevOps** - CI/CD and infrastructure
+# Show sync status
+./drive_sync.sh sync status
+```
 
-### 🌐 Web Content
-- **Articles** - Web articles and blog posts
-- **Tutorials** - How-to guides
-- **Guides** - Reference materials
-- **News** - News articles and updates
-- **Netclips** - Web clips and bookmarks
+### MCP Server (AI Integration)
 
-### 📝 Notes & Drafts
-- **Daily_Notes** - Daily journal entries
-- **Literature_Notes** - Book and paper notes
-- **Meeting_Notes** - Meeting minutes
-- **Ideas** - Brainstorming and concepts
-- **Untitled** - Draft documents
+```bash
+# Start MCP server
+./drive_sync.sh mcp start
 
-### 🔬 Projects, 📊 Data, 🗄️ Archives
-- Various project, data analysis, and archival categories
+# Check MCP server status
+./drive_sync.sh mcp status
 
-## 🧠 Intelligent Features
+# Test MCP server
+./drive_sync.sh mcp test
+```
 
-### Content-Based Categorization
-The system analyzes file content to determine the best category:
-- **AI/ML Detection**: Recognizes ML frameworks, model names, techniques
-- **Research Papers**: Identifies academic structure and subject matter
-- **Development Content**: Detects programming languages, frameworks, tools
-- **Web Content**: Distinguishes articles, tutorials, and guides
+## Document Categories
 
-### Advanced Deduplication
-- **Content Hashing**: SHA-256 based duplicate detection
-- **Best Version Selection**: Keeps newest/largest version automatically
-- **Safe Archiving**: Moves duplicates to archive instead of deleting
+### Simplified 5-Category System
 
-### Incremental Processing
-- **Change Detection**: Only processes files modified since last run
-- **Performance Optimization**: Up to 90% faster processing
-- **Smart Caching**: Maintains processing history and content hashes
+The system can use a simplified 5-category structure:
 
-## 📊 Configuration Options
+1. **🤖 AI & ML**: Machine learning, neural networks, transformers, LLMs, etc.
+2. **📚 Research Papers**: Academic papers, studies, and research documents
+3. **🌐 Web Content**: Articles, tutorials, guides, and web clips
+4. **📝 Notes & Drafts**: Meeting notes, daily notes, ideas, and drafts
+5. **💻 Development**: Code, APIs, documentation, and technical guides
 
-Edit `organize_config.conf` to customize:
+### Detailed Category System
+
+Alternatively, the system supports a detailed 47+ category structure organized into main groups:
+
+- **Research Papers**: AI_ML, Physics, Neuroscience, Mathematics, Computer_Science, Biology
+- **AI & ML**: Agents, LLMs, Computer_Vision, NLP, Neural_Networks, Transformers, Reinforcement_Learning, MLOps, Tools_Frameworks
+- **Development**: APIs, Kubernetes, Git, Documentation, Databases, Frontend, Backend, DevOps
+- **Web Content**: Articles, Tutorials, Guides, News, Netclips
+- **Notes & Drafts**: Daily_Notes, Literature_Notes, Meeting_Notes, Ideas, Untitled
+- **Projects, Data, Archives**: Various subcategories for projects, data, and archives
+
+## Sync Locations
+
+The system synchronizes documents across these locations:
+
+1. **iCloud**: `~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync`
+2. **Google Drive**: `~/Library/CloudStorage/GoogleDrive-*/My Drive/Sync`
+3. **Legacy iCloud**: `~/Downloads/Data_Science/Sync_iCloud`
+4. **Legacy Google Drive**: `~/Downloads/Data_Science/Sync_GoogleDrive`
+5. **Central Hub**: `~/Sync_Hub_New` (configurable)
+
+## Reliability Features
+
+### Error Classification
+
+The system classifies sync errors into specific types:
+- **Transient**: Temporary issues that may resolve with retries
+- **Authentication**: Credential or permission issues
+- **Conflict**: File conflicts and deadlocks
+- **Quota**: Storage or bandwidth limits
+- **Network**: Connectivity issues
+- **Configuration**: Setup or profile issues
+- **Permanent**: Issues that won't resolve with retries
+
+### Adaptive Retry
+
+Implements intelligent retry mechanisms with appropriate backoff strategies:
+- **Exponential**: Increasing delays with jitter
+- **Linear**: Fixed increment delays
+- **Quota-aware**: Service-specific delays based on quota reset times
+
+### Circuit Breaker
+
+Prevents cascading failures by temporarily disabling operations after persistent failures:
+- **Closed**: Normal operation, all requests proceed
+- **Open**: Failure threshold exceeded, requests blocked
+- **Half-open**: Testing if system has recovered
+
+## AI Integration (MCP Server)
+
+The MCP server allows AI assistants like Claude to interact with the document organization system through natural language.
+
+### Available AI Tools
+
+1. **search_documents**: Search through organized documents by content or category
+2. **get_document_content**: Retrieve full document content for analysis
+3. **organize_documents**: Run the organization system on-demand
+4. **sync_documents**: Synchronize across all platforms
+5. **get_organization_stats**: Get comprehensive system statistics
+6. **list_categories**: List all document categories with file counts
+7. **create_document**: Create new documents with automatic categorization
+
+### Setup for Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "enhanced-document-organization": {
+      "command": "node",
+      "args": ["/path/to/Drive_sync/mcp/server.js"],
+      "env": {}
+    }
+  }
+}
+```
+
+## Configuration
+
+### Main Configuration Files
+
+- **config.env**: Environment variables and paths
+- **organize_config.conf**: Organization behavior settings
+- **unison_*.prf**: Sync service profiles
+
+### Key Settings
 
 ```bash
 # Feature toggles
 ENABLE_SMART_CATEGORIZATION=true
 ENABLE_INCREMENTAL_PROCESSING=true
 ENABLE_ADVANCED_DEDUPLICATION=true
+ENABLE_CROSS_SYNC_VALIDATION=false
+ENABLE_SIMPLIFIED_CATEGORIZATION=true  # Use 5-category system
 
 # Processing parameters
 MIN_FILE_SIZE=10                    # Minimum file size in bytes
 MAX_FILENAME_LENGTH=80              # Warn about long filenames
 INCREMENTAL_THRESHOLD=3600          # Process files changed within 1 hour
+CONTENT_ANALYSIS_DEPTH=50           # Lines to analyze for categorization
 ```
 
-## 🔄 Sync Locations
+## System Requirements
 
-The system works with multiple sync locations:
-- **iCloud**: `/Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud`
-- **Google Drive**: `/Users/moatasimfarooque/Downloads/Data_Science/Sync_GoogleDrive`
-- **Obsidian**: `/Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync`
-- **Cloud Storage**: `/Users/moatasimfarooque/Library/CloudStorage/GoogleDrive-.../My Drive/Sync`
-
-## 🛡️ Safety Features
-
-### Automatic Backups
-- **Timestamped backups** created before each run
-- **Easy restoration** from any backup
-- **Configurable retention** policy
-
-### Data Integrity
-- **File validation** before processing
-- **Encoding checks** for text files
-- **Corruption detection** and quarantine
-- **Metadata preservation** during moves
-
-### Error Recovery
-- **Comprehensive logging** for troubleshooting
-- **Graceful degradation** on partial failures
-- **Manual intervention** options when needed
-
-## 📈 Performance & Monitoring
-
-### Processing Statistics
-- Files processed, moved, and categorized
-- Duplicate detection and removal counts
-- Processing time and throughput metrics
-- Error rates and success percentages
-
-### Reports Generated
-- **JSON format** for programmatic analysis
-- **Markdown format** for human readability
-- **Sync consistency** validation reports
-- **Historical comparison** data
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-**Files not categorizing correctly:**
-```bash
-# Check content analysis in config
-nano organize_config.conf
-# Increase CONTENT_ANALYSIS_DEPTH if needed
-```
-
-**Sync inconsistencies:**
-```bash
-# Run validation
-./organize_manager.sh validate
-# Check sync locations accessibility
-```
-
-**Performance issues:**
-```bash
-# Enable incremental processing
-# Clean cache regularly
-./organize_manager.sh clean
-```
-
-### System Health
-```bash
-# Check status
-./organize_manager.sh status
-
-# View configuration
-./organize_manager.sh config
-
-# Check logs (auto-created)
-tail -f organization.log
-```
-
-## 🔧 Advanced Usage
-
-### Custom Categorization
-Add custom patterns to `organize_config.conf`:
-```bash
-# Add your own keyword patterns
-CUSTOM_KEYWORDS=(
-    "your_pattern|another_pattern"
-)
-```
-
-### Batch Processing
-```bash
-# Process multiple directories
-for dir in /path/to/dir1 /path/to/dir2; do
-    SOURCE_DIR="$dir" ./organize_manager.sh run
-done
-```
-
-### Integration with Cron
-```bash
-# Add to crontab for regular organization
-crontab -e
-# Add: 0 2 * * * /path/to/organize_manager.sh run >/dev/null 2>&1
-```
-
-## 📋 System Requirements
-
-- **OS**: macOS (tested on macOS 14+)
+- **OS**: macOS 12+ (tested on macOS 14+)
 - **Shell**: bash/zsh
-- **Disk Space**: 1GB+ free for processing
-- **Memory**: 512MB+ available
-- **Permissions**: Read/write access to sync directories
-
-## 🔮 Future Enhancements
-
-The system is designed for extensibility:
-- Machine learning models for better categorization
-- API integration with note-taking apps
-- Web dashboard for remote monitoring
-- Mobile app for on-the-go management
-
----
-
-## 📞 Support
-
-For issues:
-1. Run `./organize_manager.sh status` to check system health
-2. Check the configuration with `./organize_manager.sh config`
-3. Review logs for error messages
-4. Verify directory permissions and accessibility
-
----
-
-*Enhanced Document Organization System - Your documents, perfectly organized, automatically.*
+- **Node.js**: 18+ (for MCP server)
+- **Unison**: 2.52+ (for sync functionality)
+- **Disk Space**: 2GB+ free for processing and backups

@@ -1,62 +1,0 @@
-Warning: Preference "copythreshold" is deprecated!
-It may be removed in the next release, so you should
-stop using this preference on the command line and
-in the profiles.
-
-\ 🌐 Web Content                  \ _page_1_Figure_0.md                              <---- changed    .obsidian/app.json  
-         <---- props      .obsidian/appearance.json  
-         <---- new file   .obsidian/community-plugins.json  
-         <---- changed    .obsidian/core-plugins.json  
-         <---- new dir    .obsidian/plugins  
-         <---- changed    .obsidian/workspace-mobile.json  
-         <---- new file   .obsidian/workspace.json  
-         <---- new file   _page_1_Figure_0.md  
-         <---- new file   _page_1_Figure_3..md  
-         <---- deleted    🌐 Web Content/12 Essential Git Commands for Daily Development - JavaScript in Plain English.md  
-         <---- deleted    🌐 Web Content/The Hidden Power of MCP + Google ADK — A Guide to Building Systems That Scale.md  
-         <---- changed    🌐 Web Content/The Illustrated Transformer.md  
-         <---- new file   📝 Notes & Drafts/.Rhistory  
-         <---- new file   📝 Notes & Drafts/Moatasim_resume.pdf.md  
-         <---- deleted    🤖 AI & ML/The_little_book_of_deep_learning.md  
-Starting...           Starting...           Starting...             0%  0/15  (179 B of 1.9 MiB)  --:-- ETA                                           0%  0/15  (179 B of 1.9 MiB)  --:-- ETA                                           0%  1/15  (179 B of 1.9 MiB)  --:-- ETA                                           0%  1/15  (179 B of 1.9 MiB)  --:-- ETA                                           0%  1/15  (179 B of 1.9 MiB)  --:-- ETA                                           0%  2/15  (179 B of 1.9 MiB)  --:-- ETA                                           0%  2/15  (179 B of 1.9 MiB)  --:-- ETA                                           0%  2/15  (179 B of 1.9 MiB)  --:-- ETA                                           0%  3/15  (241 B of 1.9 MiB)  --:-- ETA                                           0%  3/15  (241 B of 1.9 MiB)  --:-- ETA                                           0%  3/15  (241 B of 1.9 MiB)  --:-- ETA                                           0%  4/15  (899 B of 1.9 MiB)  --:-- ETA                                           0%  4/15  (899 B of 1.9 MiB)  --:-- ETA                                           0%  4/15  (899 B of 1.9 MiB)  --:-- ETA                                          97%  5/15  (1.8 MiB of 1.9 MiB)  --:-- ETA                                            97%  5/15  (1.8 MiB of 1.9 MiB)  --:-- ETA                                            97%  5/15  (1.8 MiB of 1.9 MiB)  --:-- ETA                                            98%  6/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                            98%  6/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                            98%  6/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                            98%  7/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                            98%  7/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                            98%  7/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                            98%  8/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                            98%  8/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                            98%  8/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                            98%  9/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                            98%  9/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                            98%  9/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                            99%  10/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                             99%  10/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                             99%  10/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                             99%  11/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                             99%  11/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                             99%  11/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                             99%  12/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                             99%  12/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                             99%  12/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                             99%  13/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                             99%  13/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                             99%  13/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                             99%  14/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                             99%  14/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                             99%  14/15  (1.9 MiB of 1.9 MiB)  --:-- ETA                                            100%  15/15  (1.9 MiB of 1.9 MiB)  00:00:00 ETA                                               100%  15/15  (1.9 MiB of 1.9 MiB)  00:00:00 ETA                                               Unison 2.53.7 (ocaml 5.2.0): Contacting server...
-Looking for changes
-Reconciling changes
-
-15 items will be synced, 0 skipped
-0 B to be synced from Sync_iCloud to Sync
-1.9 MiB to be synced from Sync to Sync_iCloud
-Propagating updates
-Unison 2.53.7 (ocaml 5.2.0) started propagating changes at 18:17:25.51 on 12 Jul 2025
-[BGN] Updating file .obsidian/app.json from /Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync to /Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud
-[END] Updating file .obsidian/app.json
-[BGN] Copying properties for .obsidian/appearance.json from /Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync to /Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud
-[END] Copying properties for .obsidian/appearance.json
-[BGN] Copying .obsidian/community-plugins.json from /Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync to /Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud
-[END] Copying .obsidian/community-plugins.json
-[BGN] Updating file .obsidian/core-plugins.json from /Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync to /Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud
-[END] Updating file .obsidian/core-plugins.json
-[BGN] Copying .obsidian/plugins from /Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync to /Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud
-[END] Copying .obsidian/plugins
-[BGN] Updating file .obsidian/workspace-mobile.json from /Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync to /Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud
-[END] Updating file .obsidian/workspace-mobile.json
-[BGN] Copying .obsidian/workspace.json from /Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync to /Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud
-[END] Copying .obsidian/workspace.json
-[BGN] Copying _page_1_Figure_0.md from /Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync to /Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud
-[END] Copying _page_1_Figure_0.md
-[BGN] Copying _page_1_Figure_3..md from /Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync to /Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud
-[END] Copying _page_1_Figure_3..md
-[BGN] Updating file 🌐 Web Content/The Illustrated Transformer.md from /Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync to /Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud
-[END] Updating file 🌐 Web Content/The Illustrated Transformer.md
-[BGN] Copying 📝 Notes & Drafts/.Rhistory from /Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync to /Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud
-[END] Copying 📝 Notes & Drafts/.Rhistory
-[BGN] Copying 📝 Notes & Drafts/Moatasim_resume.pdf.md from /Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync to /Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud
-[END] Copying 📝 Notes & Drafts/Moatasim_resume.pdf.md
-[BGN] Deleting 🌐 Web Content/12 Essential Git Commands for Daily Development - JavaScript in Plain English.md from /Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud
-[END] Deleting 🌐 Web Content/12 Essential Git Commands for Daily Development - JavaScript in Plain English.md
-[BGN] Deleting 🌐 Web Content/The Hidden Power of MCP + Google ADK — A Guide to Building Systems That Scale.md from /Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud
-[END] Deleting 🌐 Web Content/The Hidden Power of MCP + Google ADK — A Guide to Building Systems That Scale.md
-[BGN] Deleting 🤖 AI & ML/The_little_book_of_deep_learning.md from /Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud
-[END] Deleting 🤖 AI & ML/The_little_book_of_deep_learning.md
-Unison 2.53.7 (ocaml 5.2.0) finished propagating changes at 18:17:25.57 on 12 Jul 2025, 0.055 s
-Saving synchronizer state
-Synchronization complete at 18:17:25  (15 items transferred, 0 skipped, 0 failed)

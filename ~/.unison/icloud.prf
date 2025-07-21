@@ -10,8 +10,23 @@ log = true
 fastcheck = true
 times = true
 
+# Enhanced reliability settings
+retry = 5
+confirmbigdel = false
+contactquietly = true
+silent = true
+terse = true
+maxthreads = 1
+perms = 0o644
+
+# Timeout settings
+timeout = 300
+
 # Ignore patterns
 ignore = Name .DS_Store
 ignore = Name *.tmp
 ignore = Name *.lock
 ignore = Name *conflict*
+ignore = Name .obsidian
+ignore = Path .obsidian
+ignore = Path .obsidian/*

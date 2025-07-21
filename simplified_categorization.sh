@@ -1,91 +1,7 @@
-# Enhanced Document Organization Configuration
-# This file contains all configuration options for the enhanced organization script
+#!/bin/bash
 
-# ==============================================================================
-# DIRECTORY PATHS
-# ==============================================================================
-
-# Primary source directory for organization
-SOURCE_DIR="/Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud"
-
-# Backup directory (will be created with timestamp)
-BACKUP_BASE_DIR="/Users/moatasimfarooque/Downloads/Data_Science"
-
-# Cache directory for storing processing metadata
-CACHE_DIR="/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync/.cache"
-
-# All sync directories for consistency validation
-SYNC_LOCATIONS=(
-    "/Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud"
-    "/Users/moatasimfarooque/Downloads/Data_Science/Sync_GoogleDrive"
-    "/Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync"
-    "/Users/moatasimfarooque/Library/CloudStorage/GoogleDrive-moatasim23android@gmail.com/My Drive/Sync"
-)
-
-# Inbox locations across sync services
-INBOX_LOCATIONS=(
-    "/Users/moatasimfarooque/Downloads/Data_Science/Sync_iCloud/Inbox"
-    "/Users/moatasimfarooque/Downloads/Data_Science/Sync_GoogleDrive/Inbox"
-    "/Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync/Inbox"
-    "/Users/moatasimfarooque/Library/CloudStorage/GoogleDrive-moatasim23android@gmail.com/My Drive/Sync/Inbox"
-)
-
-# ==============================================================================
-# FEATURE TOGGLES
-# ==============================================================================
-
-# Enable content analysis for better categorization
-ENABLE_CONTENT_ANALYSIS=true
-
-# Enable file integrity checking
-ENABLE_INTEGRITY_CHECK=true
-
-# Enable smart categorization based on file content
-ENABLE_SMART_CATEGORIZATION=true
-
-# Enable cross-sync validation between all sync locations
-ENABLE_CROSS_SYNC_VALIDATION=false
-
-# Enable incremental processing (only process changed files)
-ENABLE_INCREMENTAL_PROCESSING=true
-
-# Enable metadata preservation during file moves
-ENABLE_METADATA_PRESERVATION=true
-
-# Enable advanced deduplication with content hashing
-ENABLE_ADVANCED_DEDUPLICATION=true
-
-# Enable progress tracking and detailed reporting
-ENABLE_PROGRESS_TRACKING=true
-
-# Enable automatic backup creation before processing
-ENABLE_BACKUP_CREATION=true
-
-# Enable simplified categorization mode (5 main categories instead of 47+)
-ENABLE_SIMPLIFIED_CATEGORIZATION=true
-
-# ==============================================================================
-# PROCESSING PARAMETERS
-# ==============================================================================
-
-# Minimum file size in bytes (files smaller than this will be removed)
-MIN_FILE_SIZE=10
-
-# Maximum filename length (warnings for longer names)
-MAX_FILENAME_LENGTH=80
-
-# Incremental processing threshold in seconds (files processed within this time are skipped)
-INCREMENTAL_THRESHOLD=3600
-
-# Content analysis depth (number of lines to analyze for categorization)
-CONTENT_ANALYSIS_DEPTH=50
-
-# Hash algorithm for content comparison (sha256, md5, sha1)
-HASH_ALGORITHM="sha256"
-
-# ==============================================================================
-# CATEGORIZATION RULES
-# ==============================================================================
+# Simplified categorization functions for document organization
+# This implements the 5-category system with pattern matching
 
 # Main categories with their detection patterns
 MAIN_CATEGORIES=(
@@ -105,184 +21,126 @@ declare -A CATEGORY_PATTERNS=(
     ["💻 Development"]="code|api|git|database|framework|programming|software|documentation|kubernetes|docker|container|devops|ci/cd|frontend|backend|server|microservice|architecture|javascript|python|java|typescript|html|css|sql|nosql|algorithm|data structure|function|method|class|object|variable|constant|parameter|argument|return value|input|output|compile|interpret|execute|run|debug|test|unit test|integration test|end-to-end test|functional test|performance test|load test|stress test|security test|penetration test|vulnerability|exploit|patch|fix|bug|issue|error|exception|warning|failure|crash|freeze|hang|deadlock|race condition|memory leak|buffer overflow|null pointer|undefined reference|type error|syntax error|runtime error|logical error|semantic error|validation error|authentication error|authorization error|permission error|access control|security|privacy|encryption|decryption|hashing|signing|verification|certificate|key|token|credential|password|username|user|role|permission|privilege|access|restriction|limitation|constraint|rule|policy|standard|convention|best practice|pattern|anti-pattern|design pattern|architectural pattern|mvc|mvvm|flux|redux|observer|singleton|factory|builder|adapter|decorator|proxy|facade|bridge|composite|strategy|command|iterator|visitor|state|memento|chain of responsibility|mediator|interpreter|template method|flyweight|prototype|dependency injection|inversion of control|separation of concerns|single responsibility|open-closed|liskov substitution|interface segregation|dependency inversion|solid principles|dry|kiss|yagni|clean code|refactoring|code smell|technical debt|legacy code|monolith|microservice|serverless|function as a service|platform as a service|infrastructure as a service|software as a service|cloud computing|edge computing|fog computing|grid computing|distributed computing|parallel computing|concurrent computing|asynchronous|synchronous|blocking|non-blocking|event-driven|reactive|functional|procedural|object-oriented|imperative|declarative|markup|stylesheet|script|module|package|library|framework|sdk|api|rest|soap|graphql|grpc|websocket|http|https|tcp|udp|ip|dns|url|uri|query string|path parameter|header|cookie|session|state|stateless|cache|cdn|load balancer|proxy|reverse proxy|gateway|firewall|vpn|ssh|ftp|smtp|imap|pop3|database|sql|nosql|relational|document|key-value|graph|time-series|column-family|newSQL|orm|query|transaction|acid|base|cap theorem|sharding|replication|partitioning|indexing|normalization|denormalization|migration|seed|backup|restore|recovery|high availability|fault tolerance|disaster recovery|scalability|elasticity|performance|throughput|latency|response time|concurrency|parallelism|thread|process|job|task|queue|stack|heap|memory|cpu|gpu|disk|network|bandwidth|throughput|latency|jitter|packet loss|congestion|bottleneck|optimization|profiling|benchmarking|monitoring|logging|tracing|alerting|notification|dashboard|metrics|analytics|telemetry|observability|instrumentation|diagnostics|troubleshooting|debugging|breakpoint|watchpoint|step over|step into|step out|continue|pause|resume|stop|start|restart|deploy|release|version|tag|branch|merge|pull request|code review|static analysis|dynamic analysis|linting|formatting|documentation|comment|annotation|javadoc|docstring|markdown|restructuredtext|asciidoc|wiki|knowledge base|faq|tutorial|guide|manual|reference|specification|requirement|user story|acceptance criteria|definition of done|agile|scrum|kanban|sprint|backlog|story point|velocity|burndown|burnup|retrospective|standup|planning|review|demo|showcase|stakeholder|customer|client|user|actor|persona|role|responsibility|accountability|ownership|collaboration|communication|coordination|integration|interoperability|compatibility|portability|maintainability|reliability|availability|security|usability|accessibility|internationalization|localization|globalization|translation|language|culture|region|timezone|date format|number format|currency format|measurement unit|color scheme|theme|style|layout|responsive|adaptive|mobile-first|desktop-first|cross-platform|cross-browser|cross-device|progressive enhancement|graceful degradation|feature detection|polyfill|shim|fallback|vendor prefix|browser compatibility|device compatibility|operating system|platform|environment|development|staging|production|qa|testing|sandbox|local|remote|cloud|on-premise|hybrid|multi-cloud|infrastructure|architecture|topology|network|server|client|peer-to-peer|master-slave|leader-follower|active-passive|active-active|blue-green|canary|rolling|immutable|mutable|stateful|stateless|idempotent|atomic|transactional|eventual consistency|strong consistency|causal consistency|read consistency|write consistency|isolation level|read uncommitted|read committed|repeatable read|serializable|snapshot isolation|mvcc|optimistic locking|pessimistic locking|deadlock prevention|deadlock detection|deadlock recovery|livelock|starvation|priority inversion|resource allocation|resource management|garbage collection|memory management|reference counting|mark and sweep|generational|compaction|fragmentation|leak|overflow|underflow|boundary condition|edge case|corner case|happy path|sad path|error path|exception handling|try-catch|finally|throw|raise|propagate|bubble up|swallow|recover|retry|timeout|backoff|circuit breaker|bulkhead|rate limiting|throttling|debouncing|batching|pooling|caching|memoization|lazy loading|eager loading|preloading|prefetching|streaming|buffering|pagination|infinite scroll|virtual scrolling|windowing|rendering|painting|compositing|layout|reflow|repaint|animation|transition|transform|filter|blend mode|opacity|visibility|z-index|stacking context|box model|flexbox|grid|float|position|display|overflow|margin|padding|border|outline|shadow|gradient|background|foreground|text|font|typography|icon|image|svg|canvas|webgl|3d|animation|transition|transform|filter|blend mode|opacity|visibility|accessibility|aria|screen reader|keyboard navigation|focus management|tab order|color contrast|alternative text|semantic html|landmark|region|heading|list|table|form|input|validation|feedback|error message|success message|warning message|info message|toast|notification|alert|modal|dialog|popup|tooltip|dropdown|accordion|tab|panel|carousel|slider|gallery|lightbox|video player|audio player|media|streaming|progressive download|adaptive bitrate|codec|container|format|resolution|aspect ratio|frame rate|bitrate|quality|compression|lossless|lossy|metadata|exif|geolocation|timestamp|author|copyright|license|terms of service|privacy policy|cookie policy|gdpr|ccpa|hipaa|pci dss|sox|iso|compliance|regulation|standard|certification|audit|assessment|evaluation|review|inspection|verification|validation|approval|rejection|acceptance|denial|grant|revoke|enable|disable|activate|deactivate|register|unregister|subscribe|unsubscribe|publish|unpublish|broadcast|narrowcast|unicast|multicast|anycast|push|pull|sync|async|real-time|batch|scheduled|periodic|recurring|one-time|on-demand|event-driven|time-driven|data-driven|user-driven|system-driven|automatic|manual|interactive|passive|active|reactive|proactive|predictive|prescriptive|descriptive|diagnostic|monitoring|alerting|notification|reporting|analytics|business intelligence|data mining|machine learning|artificial intelligence|natural language processing|computer vision|speech recognition|recommendation|personalization|customization|configuration|setting|preference|option|flag|feature toggle|a/b testing|multivariate testing|experiment|hypothesis|control group|treatment group|conversion|funnel|retention|churn|acquisition|activation|revenue|referral|growth|viral|organic|paid|marketing|sales|customer|user|client|stakeholder|partner|vendor|supplier|provider|consumer|producer|prosumer|administrator|moderator|editor|author|contributor|viewer|reader|listener|watcher|follower|friend|connection|contact|member|subscriber|premium|free|trial|demo|beta|alpha|release candidate|stable|unstable|development|experimental|deprecated|sunset|end of life|maintenance|support|service level agreement|uptime|downtime|maintenance window|scheduled maintenance|unscheduled maintenance|incident|outage|degradation|resolution|mitigation|workaround|root cause analysis|post-mortem|retrospective|lessons learned|knowledge sharing|documentation|wiki|knowledge base|faq|help center|support portal|ticket|issue|bug|feature request|enhancement|improvement|suggestion|feedback|comment|review|rating|vote|poll|survey|questionnaire|interview|focus group|user testing|usability testing|a/b testing|multivariate testing|split testing|canary testing|blue-green deployment|feature flag|toggle|switch|configuration|setting|preference|option|default|override|custom|standard|template|boilerplate|scaffold|generator|wizard|assistant|helper|utility|tool|plugin|extension|addon|module|component|widget|gadget|app|application|service|daemon|process|thread|job|task|queue|stack|heap|memory|storage|disk|file|folder|directory|path|url|uri|endpoint|route|controller|model|view|template|layout|theme|style|design|user interface|user experience|frontend|backend|full-stack|client-side|server-side|database|data store|repository|cache|index|search|query|filter|sort|paginate|aggregate|join|union|intersection|difference|subset|superset|collection|list|array|set|map|dictionary|hash|tree|graph|network|mesh|grid|matrix|vector|scalar|number|string|boolean|date|time|datetime|timestamp|duration|interval|period|range|boundary|limit|threshold|minimum|maximum|average|mean|median|mode|sum|count|distinct|unique|duplicate|redundant|sparse|dense|empty|full|partial|complete|incomplete|valid|invalid|correct|incorrect|accurate|inaccurate|precise|imprecise|exact|approximate|estimated|calculated|measured|observed|predicted|projected|forecasted|historical|current|future|past|present|upcoming|scheduled|planned|actual|target|goal|objective|key result|metric|indicator|signal|noise|pattern|trend|anomaly|outlier|spike|dip|plateau|growth|decline|stable|unstable|volatile|steady|consistent|inconsistent|regular|irregular|periodic|aperiodic|cyclic|acyclic|linear|nonlinear|exponential|logarithmic|polynomial|rational|irrational|integer|float|double|decimal|binary|hexadecimal|octal|ascii|unicode|utf-8|utf-16|base64|md5|sha|hash|encrypt|decrypt|sign|verify|authenticate|authorize|identify|verify|validate|check|test|assert|expect|should|must|may|can|will|shall|should not|must not|may not|cannot|will not|shall not"
 )
 
-# Custom categories file location
-CUSTOM_CATEGORIES_FILE="$CONFIG_DIR/custom_categories.conf"
-
-# Legacy keyword patterns (kept for backward compatibility)
-AI_ML_KEYWORDS=(
-    "machine learning|ml|artificial intelligence|ai|deep learning|neural|network|model|algorithm"
-    "pytorch|tensorflow|keras|scikit|pandas|numpy|jupyter|python|data.science"
-    "transformer|attention|bert|gpt|llama|claude|language.model|llm|chatgpt|openai"
-    "agent|agentic|multi.agent|autonomous|agent.based|langchain|autogen|crew"
-    "cnn|convolutional|computer.vision|opencv|image|vision|detection|recognition"
-    "nlp|natural.language|text.processing|sentiment|tokenization|embedding"
-    "reinforcement.learning|rl|q.learning|policy|reward|environment|gaming"
-    "mlops|model.deployment|kubernetes|docker|production|monitoring|pipeline"
+# Inbox locations across sync services
+INBOX_LOCATIONS=(
+    "$GOOGLE_DRIVE_PATH/Inbox"
+    "$ICLOUD_SYNC_PATH/Inbox"
 )
 
-# Research paper patterns
-RESEARCH_KEYWORDS=(
-    "abstract|introduction|methodology|conclusion|references|doi:|arxiv:|paper|study|research"
-    "journal|proceedings|conference|publication|citation|bibliography|peer.review"
-    "experiment|hypothesis|analysis|results|discussion|findings|evaluation"
-)
+# Simplified analyze_content_category function
+# This function analyzes file content and categorizes it into one of the 5 main categories
+analyze_content_category() {
+    local file="$1"
+    local content=""
+    local filename=$(basename "$file")
+    
+    # Skip if recently processed and incremental mode is enabled
+    if [[ "$ENABLE_INCREMENTAL_PROCESSING" == "true" ]] && is_recently_processed "$file"; then
+        # Return cached category
+        local cached_category=$(grep "^${file}|" "$PROCESSED_FILES_DB" | cut -d'|' -f4)
+        if [[ -n "$cached_category" ]]; then
+            echo "$cached_category"
+            return
+        fi
+    fi
+    
+    # Read content for analysis (first 50 lines + filename)
+    content=$(head -50 "$file" 2>/dev/null | tr '[:upper:]' '[:lower:]' || echo "")
+    content="$content $(echo "$filename" | tr '[:upper:]' '[:lower:]')"
+    
+    # Define priority order for categories (check Notes & Drafts first for specific phrases)
+    local priority_categories=(
+        "📝 Notes & Drafts"
+        "🤖 AI & ML"
+        "📚 Research Papers"
+        "💻 Development"
+        "🌐 Web Content"
+    )
+    
+    # First check for multi-word patterns that are more specific
+    for category in "${priority_categories[@]}"; do
+        local pattern="${CATEGORY_PATTERNS[$category]}"
+        
+        # Extract multi-word patterns (containing spaces)
+        local IFS="|"
+        for part in $pattern; do
+            if [[ "$part" == *" "* ]]; then
+                if echo "$content" | grep -q "$part"; then
+                    echo "$category"
+                    return
+                fi
+            fi
+        done
+    done
+    
+    # Then check for regular patterns
+    for category in "${MAIN_CATEGORIES[@]}"; do
+        local pattern="${CATEGORY_PATTERNS[$category]}"
+        if [[ -n "$pattern" ]] && echo "$content" | grep -qE "($pattern)"; then
+            echo "$category"
+            return
+        fi
+    done
+    
+    # Check for custom categories if defined
+    if [[ -f "$CUSTOM_CATEGORIES_FILE" ]]; then
+        while IFS='|' read -r cat_name cat_emoji cat_keywords cat_date; do
+            if [[ -n "$cat_keywords" ]]; then
+                # Replace commas with pipe for regex OR
+                local custom_pattern=$(echo "$cat_keywords" | tr ',' '|')
+                if echo "$content" | grep -qE "($custom_pattern)"; then
+                    echo "$cat_emoji $cat_name"
+                    return
+                fi
+            fi
+        done < "$CUSTOM_CATEGORIES_FILE"
+    fi
+    
+    # Fallback to Notes & Drafts if no match found
+    echo "📝 Notes & Drafts"
+}
 
-# Development patterns
-DEVELOPMENT_KEYWORDS=(
-    "api|endpoint|rest|graphql|json|http|web.service|microservice|backend|frontend"
-    "kubernetes|k8s|docker|container|pod|deploy|orchestration|helm|devops"
-    "git|github|gitlab|commit|branch|merge|pull.request|version.control"
-    "database|sql|nosql|mongodb|postgresql|mysql|redis|elasticsearch|data"
-    "react|vue|angular|javascript|typescript|html|css|frontend|ui|ux|design"
-    "node|express|django|flask|backend|server|api|microservice|architecture"
-)
+# Function to check if content matches a specific category
+matches_category() {
+    local content="$1"
+    local category="$2"
+    local pattern="${CATEGORY_PATTERNS[$category]}"
+    
+    if [[ -n "$pattern" ]] && echo "$content" | grep -qE "($pattern)"; then
+        return 0  # Match found
+    else
+        return 1  # No match
+    fi
+}
 
-# ==============================================================================
-# FOLDER STRUCTURE CONFIGURATION
-# ==============================================================================
-
-# Define the complete folder structure that should be maintained
-REQUIRED_FOLDERS=(
-    "📚 Research Papers/AI_ML"
-    "📚 Research Papers/Physics"
-    "📚 Research Papers/Neuroscience"
-    "📚 Research Papers/Mathematics"
-    "📚 Research Papers/Computer_Science"
-    "📚 Research Papers/Biology"
-    "🤖 AI & ML/Agents"
-    "🤖 AI & ML/Transformers"
-    "🤖 AI & ML/Neural_Networks"
-    "🤖 AI & ML/LLMs"
-    "🤖 AI & ML/Tools_Frameworks"
-    "🤖 AI & ML/Reinforcement_Learning"
-    "🤖 AI & ML/Computer_Vision"
-    "🤖 AI & ML/NLP"
-    "🤖 AI & ML/MLOps"
-    "💻 Development/APIs"
-    "💻 Development/Kubernetes"
-    "💻 Development/Git"
-    "💻 Development/Documentation"
-    "💻 Development/Databases"
-    "💻 Development/Frontend"
-    "💻 Development/Backend"
-    "💻 Development/DevOps"
-    "🌐 Web Content/Articles"
-    "🌐 Web Content/Tutorials"
-    "🌐 Web Content/Guides"
-    "🌐 Web Content/News"
-    "🌐 Web Content/Netclips"
-    "📝 Notes & Drafts/Daily_Notes"
-    "📝 Notes & Drafts/Literature_Notes"
-    "📝 Notes & Drafts/Untitled"
-    "📝 Notes & Drafts/Meeting_Notes"
-    "📝 Notes & Drafts/Ideas"
-    "🗄️ Archives/Duplicates"
-    "🗄️ Archives/Legacy"
-    "🗄️ Archives/Quarantine"
-    "🔬 Projects/Active"
-    "🔬 Projects/Completed"
-    "🔬 Projects/Ideas"
-    "📊 Data/Datasets"
-    "📊 Data/Analysis"
-    "📊 Data/Visualizations"
-)
-
-# ==============================================================================
-# NOTIFICATION AND REPORTING
-# ==============================================================================
-
-# Enable email notifications (requires mail command setup)
-ENABLE_EMAIL_NOTIFICATIONS=false
-EMAIL_RECIPIENT=""
-
-# Enable Slack notifications (requires webhook URL)
-ENABLE_SLACK_NOTIFICATIONS=false
-SLACK_WEBHOOK_URL=""
-
-# Report format (markdown, json, both)
-REPORT_FORMAT="both"
-
-# Keep detailed logs of all operations
-ENABLE_DETAILED_LOGGING=true
-
-# Log file location
-LOG_FILE="/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync/organization.log"
-
-# ==============================================================================
-# ADVANCED SETTINGS
-# ==============================================================================
-
-# Parallel processing (experimental - set to 1 to disable)
-MAX_PARALLEL_PROCESSES=1
-
-# Dry run mode (test without making changes)
-DRY_RUN_MODE=false
-
-# Verbose output level (0=quiet, 1=normal, 2=verbose, 3=debug)
-VERBOSE_LEVEL=1
-
-# Auto-fix common issues (broken symlinks, permissions, etc.)
-AUTO_FIX_ISSUES=true
-
-# Archive old versions instead of deleting
-ARCHIVE_OLD_VERSIONS=true
-
-# Maximum number of backup versions to keep
-MAX_BACKUP_VERSIONS=10
-
-# ==============================================================================
-# PERFORMANCE TUNING
-# ==============================================================================
-
-# Cache expiration time in seconds
-CACHE_EXPIRATION=86400
-
-# Maximum file size for content analysis (in bytes)
-MAX_CONTENT_ANALYSIS_SIZE=1048576
-
-# Skip binary files during processing
-SKIP_BINARY_FILES=true
-
-# Use fast file comparison for duplicates
-FAST_DUPLICATE_DETECTION=true
-
-# ==============================================================================
-# SAFETY SETTINGS
-# ==============================================================================
-
-# Confirm before deleting files
-CONFIRM_DELETIONS=true
-
-# Maximum number of files to process in one run
-MAX_FILES_PER_RUN=10000
-
-# Quarantine suspicious files instead of deleting
-QUARANTINE_SUSPICIOUS_FILES=true
-
-# Create checksums for important files
-CREATE_CHECKSUMS=true
-
-# ==============================================================================
-# INTEGRATION SETTINGS
-# ==============================================================================
-
-# Sync with Obsidian vault after processing
-SYNC_WITH_OBSIDIAN=true
-
-# Update Obsidian graph after organization
-UPDATE_OBSIDIAN_GRAPH=true
-
-# Run Unison sync after processing
-RUN_UNISON_SYNC=true
-
-# Unison profile names to sync
-UNISON_PROFILES=("icloud" "google_drive")
-
-# ==============================================================================
-# END OF CONFIGURATION
-# ==============================================================================
-
-# Note: This configuration file is sourced by the enhanced organization script.
-# Modify these settings according to your specific needs and environment.
-# Boolean values should be 'true' or 'false' (lowercase).
-# Arrays should follow bash array syntax: ARRAY=(item1 item2 item3)
+# Function to process files from Inbox folders
+process_inbox_folders() {
+    for inbox_path in "${INBOX_LOCATIONS[@]}"; do
+        if [[ -d "$inbox_path" ]]; then
+            echo "Processing Inbox: $inbox_path"
+            
+            # Find all files in the Inbox
+            find "$inbox_path" -type f | while read -r file; do
+                # Determine category
+                local category=$(analyze_content_category "$file")
+                
+                # Create category folder if it doesn't exist
+                mkdir -p "$category"
+                
+                # Move file to category folder
+                local filename=$(basename "$file")
+                echo "Moving: $filename -> $category"
+                
+                # Use move_file_enhanced if available, otherwise simple move
+                if type move_file_enhanced &>/dev/null; then
+                    move_file_enhanced "$file" "$category" true
+                else
+                    mv "$file" "$category/"
+                fi
+            done
+        else
+            echo "Creating Inbox folder: $inbox_path"
+            mkdir -p "$inbox_path"
+        fi
+    done
+}

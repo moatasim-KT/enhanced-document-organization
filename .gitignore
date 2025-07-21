@@ -1,0 +1,89 @@
+# Personal configuration
+config.env
+
+# Logs and debugging
+*.log
+sync_manager.log
+performance.log
+automation.log
+automation_error.log
+debug_*.log
+launchd_*.log
+*_cron.log
+test_*.log
+alerts.log
+
+# MCP Server
+mcp-server/server.log
+mcp-server/.server.pid
+
+# Backup directories
+*_backup_*
+Manual_Backup_*
+backup_*
+
+# Node modules and dependencies
+node_modules/
+mcp-server/node_modules/
+.npm
+*.tgz
+
+# System files
+.DS_Store
+.localized
+.Spotlight-V100
+.Trashes
+.fseventsd
+.TemporaryItems
+.AppleDouble
+.LSOverride
+Icon?
+._*
+*.tmp
+*.temp
+*.swp
+*~
+.#*
+#*#
+
+# Personal sync directories (users should configure their own)
+Sync_*/
+Sync_Hub_*/
+
+# Statistics and reports
+organization_stats_*.json
+organization_report_*.md
+sync_health_report.txt
+sync_metrics.json
+*_stats_*.json
+*_report_*.md
+
+# Cache and temporary data
+.cache/
+cache/
+temp/
+.temp/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.sublime-*
+*.swp
+*.swo
+
+# Unison temporary files
+.unison/
+*.prf.tmp
+*.sync-conflict-*
+
+# Personal configurations
+claude_desktop_config.json
+
+# Archive and old files
+archive_old_files/
+*_old
+*_legacy
+
+# Test files
+test_*
+*_test.*

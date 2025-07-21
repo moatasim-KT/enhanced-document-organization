@@ -1,24 +1,0 @@
-Unison 2.53.7 (ocaml 5.2.0): Contacting server...
-Looking for changes
-/ 🎯 Projects & Ideas/Interview_pr...ata_Science_Docker_and_Kubernetes                                                                        / 📚 Research & Learning/_1.DS_Store                                      - 📝 Notes & Documentation                            Reconciling changes
-         error            📊 Data & Resources/_1.DS_Store  
-Error in digesting /Users/moatasimfarooque/Library/CloudStorage/GoogleDrive-moatasim23android@gmail.com/My Drive/Sync/📊 Data & Resources/_1.DS_Store:
-Operation timed out
-         error            📚 Research & Learning/_1.DS_Store  
-Error in digesting /Users/moatasimfarooque/Library/CloudStorage/GoogleDrive-moatasim23android@gmail.com/My Drive/Sync/📚 Research & Learning/_1.DS_Store:
-Operation timed out
-         error            📝 Notes & Documentation/.Rhistory  
-Error in digesting /Users/moatasimfarooque/Library/CloudStorage/GoogleDrive-moatasim23android@gmail.com/My Drive/Sync/📝 Notes & Documentation/.Rhistory:
-Operation timed out
-
-0 items will be synced, 3 skipped
-0 B to be synced from Sync_Hub_New to Sync
-0 B to be synced from Sync to Sync_Hub_New
-No updates to propagate
-Synchronization complete at 18:09:13  (0 items transferred, 3 skipped, 0 failed)
-  skipped: 📊 Data & Resources/_1.DS_Store (Error in digesting /Users/moatasimfarooque/Library/CloudStorage/GoogleDrive-moatasim23android@gmail.com/My Drive/Sync/📊 Data & Resources/_1.DS_Store:
-Operation timed out)
-  skipped: 📚 Research & Learning/_1.DS_Store (Error in digesting /Users/moatasimfarooque/Library/CloudStorage/GoogleDrive-moatasim23android@gmail.com/My Drive/Sync/📚 Research & Learning/_1.DS_Store:
-Operation timed out)
-  skipped: 📝 Notes & Documentation/.Rhistory (Error in digesting /Users/moatasimfarooque/Library/CloudStorage/GoogleDrive-moatasim23android@gmail.com/My Drive/Sync/📝 Notes & Documentation/.Rhistory:
-Operation timed out)

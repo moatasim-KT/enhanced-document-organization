@@ -159,51 +159,85 @@ validate_folder_structure() {
         return 1
     fi
     
-    # Enhanced folder structure with more granular categories
-    local required_structure=(
-        "📚 Research Papers/AI_ML"
-        "📚 Research Papers/Physics"
-        "📚 Research Papers/Neuroscience"
-        "📚 Research Papers/Mathematics"
-        "📚 Research Papers/Computer_Science"
-        "📚 Research Papers/Biology"
-        "🤖 AI & ML/Agents"
-        "🤖 AI & ML/Transformers"
-        "🤖 AI & ML/Neural_Networks"
-        "🤖 AI & ML/LLMs"
-        "🤖 AI & ML/Tools_Frameworks"
-        "🤖 AI & ML/Reinforcement_Learning"
-        "🤖 AI & ML/Computer_Vision"
-        "🤖 AI & ML/NLP"
-        "🤖 AI & ML/MLOps"
-        "💻 Development/APIs"
-        "💻 Development/Kubernetes"
-        "💻 Development/Git"
-        "💻 Development/Documentation"
-        "💻 Development/Databases"
-        "💻 Development/Frontend"
-        "💻 Development/Backend"
-        "💻 Development/DevOps"
-        "🌐 Web Content/Articles"
-        "🌐 Web Content/Tutorials"
-        "🌐 Web Content/Guides"
-        "🌐 Web Content/News"
-        "🌐 Web Content/Netclips"
-        "📝 Notes & Drafts/Daily_Notes"
-        "📝 Notes & Drafts/Literature_Notes"
-        "📝 Notes & Drafts/Untitled"
-        "📝 Notes & Drafts/Meeting_Notes"
-        "📝 Notes & Drafts/Ideas"
-        "🗄️ Archives/Duplicates"
-        "🗄️ Archives/Legacy"
-        "🗄️ Archives/Quarantine"
-        "🔬 Projects/Active"
-        "🔬 Projects/Completed"
-        "🔬 Projects/Ideas"
-        "📊 Data/Datasets"
-        "📊 Data/Analysis"
-        "📊 Data/Visualizations"
-    )
+    local required_structure=()
+    
+    # Use simplified structure if enabled
+    if [[ "$ENABLE_SIMPLIFIED_CATEGORIZATION" == "true" ]]; then
+        # Simplified 5-category structure
+        required_structure=(
+            "🤖 AI & ML"
+            "📚 Research Papers"
+            "🌐 Web Content"
+            "📝 Notes & Drafts"
+            "💻 Development"
+            "🗄️ Archives/Duplicates"
+            "🗄️ Archives/Legacy"
+            "🗄️ Archives/Quarantine"
+        )
+        
+        # Add Inbox folder to each sync location
+        for inbox_path in "${INBOX_LOCATIONS[@]}"; do
+            if [[ ! -d "$inbox_path" ]]; then
+                echo -e "${YELLOW}📂 Creating Inbox folder: $inbox_path${NC}"
+                mkdir -p "$inbox_path"
+            fi
+        done
+        
+        # Add custom categories if they exist
+        if [[ -f "$CUSTOM_CATEGORIES_FILE" ]]; then
+            while IFS='|' read -r cat_name cat_emoji cat_keywords cat_date; do
+                if [[ -n "$cat_name" && -n "$cat_emoji" ]]; then
+                    required_structure+=("$cat_emoji $cat_name")
+                fi
+            done < "$CUSTOM_CATEGORIES_FILE"
+        fi
+    else
+        # Enhanced folder structure with more granular categories (legacy)
+        required_structure=(
+            "📚 Research Papers/AI_ML"
+            "📚 Research Papers/Physics"
+            "📚 Research Papers/Neuroscience"
+            "📚 Research Papers/Mathematics"
+            "📚 Research Papers/Computer_Science"
+            "📚 Research Papers/Biology"
+            "🤖 AI & ML/Agents"
+            "🤖 AI & ML/Transformers"
+            "🤖 AI & ML/Neural_Networks"
+            "🤖 AI & ML/LLMs"
+            "🤖 AI & ML/Tools_Frameworks"
+            "🤖 AI & ML/Reinforcement_Learning"
+            "🤖 AI & ML/Computer_Vision"
+            "🤖 AI & ML/NLP"
+            "🤖 AI & ML/MLOps"
+            "💻 Development/APIs"
+            "💻 Development/Kubernetes"
+            "💻 Development/Git"
+            "💻 Development/Documentation"
+            "💻 Development/Databases"
+            "💻 Development/Frontend"
+            "💻 Development/Backend"
+            "💻 Development/DevOps"
+            "🌐 Web Content/Articles"
+            "🌐 Web Content/Tutorials"
+            "🌐 Web Content/Guides"
+            "🌐 Web Content/News"
+            "🌐 Web Content/Netclips"
+            "📝 Notes & Drafts/Daily_Notes"
+            "📝 Notes & Drafts/Literature_Notes"
+            "📝 Notes & Drafts/Untitled"
+            "📝 Notes & Drafts/Meeting_Notes"
+            "📝 Notes & Drafts/Ideas"
+            "🗄️ Archives/Duplicates"
+            "🗄️ Archives/Legacy"
+            "🗄️ Archives/Quarantine"
+            "🔬 Projects/Active"
+            "🔬 Projects/Completed"
+            "🔬 Projects/Ideas"
+            "📊 Data/Datasets"
+            "📊 Data/Analysis"
+            "📊 Data/Visualizations"
+        )
+    fi
     
     local missing_dirs=()
     local created_dirs=0
@@ -278,7 +312,7 @@ check_file_integrity() {
     return 0
 }
 
-# Enhanced content analysis with machine learning-like categorization
+# Enhanced content analysis with simplified categorization
 analyze_content_category() {
     local file="$1"
     local content=""
@@ -298,6 +332,37 @@ analyze_content_category() {
     content=$(head -50 "$file" 2>/dev/null | tr '[:upper:]' '[:lower:]' || echo "")
     content="$content $(echo "$filename" | tr '[:upper:]' '[:lower:]')"
     
+    # If simplified categorization is enabled, use the simplified approach
+    if [[ "$ENABLE_SIMPLIFIED_CATEGORIZATION" == "true" ]]; then
+        # Check against each main category pattern
+        for category in "${MAIN_CATEGORIES[@]}"; do
+            local pattern="${CATEGORY_PATTERNS[$category]}"
+            if [[ -n "$pattern" ]] && echo "$content" | grep -qE "($pattern)"; then
+                echo "$category"
+                return
+            fi
+        done
+        
+        # Check for custom categories if defined
+        if [[ -f "$CUSTOM_CATEGORIES_FILE" ]]; then
+            while IFS='|' read -r cat_name cat_emoji cat_keywords cat_date; do
+                if [[ -n "$cat_keywords" ]]; then
+                    # Replace commas with pipe for regex OR
+                    local custom_pattern=$(echo "$cat_keywords" | tr ',' '|')
+                    if echo "$content" | grep -qE "($custom_pattern)"; then
+                        echo "$cat_emoji $cat_name"
+                        return
+                    fi
+                fi
+            done < "$CUSTOM_CATEGORIES_FILE"
+        fi
+        
+        # Fallback to Notes & Drafts if no match found
+        echo "📝 Notes & Drafts"
+        return
+    fi
+    
+    # Legacy categorization logic (47+ categories) if simplified mode is disabled
     # Enhanced AI/ML categorization with scoring
     local ai_ml_score=0
     local research_score=0
