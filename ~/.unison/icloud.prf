@@ -1,0 +1,17 @@
+# iCloud Sync Profile
+root = /Users/moatasimfarooque/Sync_Hub_New
+root = /Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync
+
+# Unison options
+auto = true
+batch = true
+prefer = newer
+log = true
+fastcheck = true
+times = true
+
+# Ignore patterns
+ignore = Name .DS_Store
+ignore = Name *.tmp
+ignore = Name *.lock
+ignore = Name *conflict*
