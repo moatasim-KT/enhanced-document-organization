@@ -1,0 +1,56 @@
+# Personal configuration
+config.env
+.git
+# Logs
+*.log
+sync_manager.log
+performance.log
+
+# MCP Server
+mcp-server/server.log
+mcp-server/.server.pid
+
+# Backup directories
+*_backup_*
+Manual_Backup_*
+
+# Node modules
+node_modules/
+mcp-server/node_modules/
+
+# System files
+.DS_Store
+.localized
+.Spotlight-V100
+.Trashes
+.fseventsd
+.TemporaryItems
+*.tmp
+*.swp
+*~
+.#*
+#*#
+
+# Personal sync directories (users should configure their own)
+Sync_*/
+
+# Statistics and reports
+organization_stats_*.json
+organization_report_*.md
+sync_health_report.txt
+sync_metrics.json
+
+# Cache
+.cache/
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# Unison temporary files
+.unison/
+*.prf.tmp
+
+# Personal Claude Desktop config
+claude_desktop_config.json
