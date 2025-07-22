@@ -1,1 +1,1 @@
-Update this file below with debug, logs,errors, warnings and progress in bullets creating a heading for each
+Create json files with debug, logs,errors, warnings and progress in this directory /Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync/.gemini

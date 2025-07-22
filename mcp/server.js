@@ -73,9 +73,70 @@ class DocumentOrganizationMCP {
                   type: 'number',
                   description: 'Maximum number of results to return (default: 10)',
                   default: 10
+                },
+                context: {
+                  type: 'string',
+                  description: 'Optional: Previous conversation context for improved relevance'
                 }
               },
               required: ['query']
+            }
+          },
+          {
+            name: 'summarize_document',
+            description: 'Generate a summary of a specific document',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                file_path: {
+                  type: 'string',
+                  description: 'Relative path to the document from sync directory'
+                },
+                length: {
+                  type: 'string',
+                  description: 'Desired summary length (e.g., "short", "medium", "long")',
+                  enum: ['short', 'medium', 'long'],
+                  default: 'medium'
+                }
+              },
+              required: ['file_path']
+            }
+          },
+          {
+            name: 'batch_create_documents',
+            description: 'Create multiple new documents in the appropriate categories',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                documents: {
+                  type: 'array',
+                  description: 'Array of document objects to create',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      title: {
+                        type: 'string',
+                        description: 'Title of the document'
+                      },
+                      content: {
+                        type: 'string',
+                        description: 'Content of the document in markdown format'
+                      },
+                      category: {
+                        type: 'string',
+                        description: 'Category to place the document in (optional - will auto-categorize if not specified)'
+                      }
+                    },
+                    required: ['title', 'content']
+                  }
+                },
+                auto_organize: {
+                  type: 'boolean',
+                  description: 'Whether to run auto-organization after creating the documents',
+                  default: true
+                }
+              },
+              required: ['documents']
             }
           },
           {
@@ -131,6 +192,21 @@ class DocumentOrganizationMCP {
             inputSchema: {
               type: 'object',
               properties: {}
+            }
+          },
+          {
+            name: 'get_system_metrics',
+            description: 'Get detailed system performance metrics, usage patterns, sync efficiency, and error tracking',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                time_range: {
+                  type: 'string',
+                  description: 'Optional: Time range for metrics (e.g., "24h", "7d", "30d")',
+                  enum: ['24h', '7d', '30d'],
+                  default: '24h'
+                }
+              }
             }
           },
           {
@@ -225,7 +301,13 @@ class DocumentOrganizationMCP {
 
       switch (name) {
         case 'search_documents':
-          return await this.searchDocuments(args.query, args.category, args.limit);
+          return await this.searchDocuments(args.query, args.category, args.limit, args.context);
+
+        case 'summarize_document':
+          return await this.summarizeDocument(args.file_path, args.length);
+
+        case 'batch_create_documents':
+          return await this.batchCreateDocuments(args.documents, args.auto_organize);
 
         case 'get_document_content':
           return await this.getDocumentContent(args.file_path);
@@ -238,6 +320,9 @@ class DocumentOrganizationMCP {
 
         case 'get_organization_stats':
           return await this.getOrganizationStats();
+
+        case 'get_system_metrics':
+          return await this.getSystemMetrics(args.time_range);
 
         case 'list_categories':
           return await this.listCategories();
@@ -282,9 +367,10 @@ class DocumentOrganizationMCP {
     return 'Uncategorized';
   }
 
-  async searchDocuments(query, category = null, limit = 10) {
+  async searchDocuments(query, category = null, limit = 10, context = null) {
     const results = [];
     const searchTerm = query.toLowerCase();
+    const contextTerms = context ? context.toLowerCase().split(/\s+/) : [];
     
     try {
       const files = await this.getAllMarkdownFiles(PRIMARY_SYNC_DIR);
@@ -313,7 +399,7 @@ class DocumentOrganizationMCP {
             title: fileName,
             category: fileCategory,
             preview: preview,
-            score: this.calculateRelevanceScore(searchTerm, fileName, content)
+            score: this.calculateRelevanceScore(searchTerm, fileName, content, contextTerms)
           });
         }
         
@@ -330,6 +416,7 @@ class DocumentOrganizationMCP {
             text: JSON.stringify({
               query: query,
               category: category,
+              context: context,
               results: results.slice(0, limit),
               total_found: results.length
             }, null, 2)
@@ -341,7 +428,7 @@ class DocumentOrganizationMCP {
     }
   }
 
-  calculateRelevanceScore(searchTerm, fileName, content) {
+  calculateRelevanceScore(searchTerm, fileName, content, contextTerms) {
     let score = 0;
     
     // Higher score for title matches
@@ -353,8 +440,84 @@ class DocumentOrganizationMCP {
     const contentLower = content.toLowerCase();
     const matches = (contentLower.match(new RegExp(searchTerm, 'g')) || []).length;
     score += matches;
+
+    // Score based on context terms
+    for (const term of contextTerms) {
+      if (fileName.toLowerCase().includes(term)) {
+        score += 5; // Boost for context in title
+      }
+      score += (contentLower.match(new RegExp(term, 'g')) || []).length; // Boost for context in content
+    }
     
     return score;
+  }
+
+  async summarizeDocument(filePath, length = 'medium') {
+    const fullPath = path.join(PRIMARY_SYNC_DIR, filePath);
+    
+    try {
+      const content = await fs.readFile(fullPath, 'utf-8');
+      let summary = '';
+
+      // Basic summarization logic
+      const sentences = content.split(/(?<=[.!?])\s+/); // Split by sentence-ending punctuation
+      
+      if (length === 'short') {
+        summary = sentences.slice(0, Math.min(3, sentences.length)).join(' ');
+      } else if (length === 'medium') {
+        summary = sentences.slice(0, Math.min(7, sentences.length)).join(' ');
+      } else { // long
+        summary = sentences.slice(0, Math.min(15, sentences.length)).join(' ');
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              file_path: filePath,
+              summary: summary,
+              length: length
+            }, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Failed to summarize document: ${error.message}`);
+    }
+  }
+
+  async batchCreateDocuments(documents, autoOrganize = true) {
+    const results = [];
+    for (const doc of documents) {
+      try {
+        const createResult = await this.createDocument(doc.title, doc.content, doc.category, autoOrganize);
+        results.push({
+          title: doc.title,
+          status: 'success',
+          details: createResult.content[0].text // Assuming createDocument returns content in this format
+        });
+      } catch (error) {
+        results.push({
+          title: doc.title,
+          status: 'failed',
+          error: error.message
+        });
+      }
+    }
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            operation: 'batch_create_documents',
+            total_documents: documents.length,
+            results: results
+          }, null, 2)
+        }
+      ]
+    };
   }
 
   async getDocumentContent(filePath) {
@@ -463,6 +626,81 @@ class DocumentOrganizationMCP {
       };
     } catch (error) {
       throw new Error(`Failed to get stats: ${error.message}`);
+    }
+  }
+
+  async getSystemMetrics(timeRange = '24h') {
+    try {
+      // Simulate performance metrics (replace with actual data collection)
+      const performanceMetrics = {
+        cpu_usage: '25%',
+        memory_usage: '40%',
+        disk_io: '10 MB/s',
+        network_traffic: '5 MB/s'
+      };
+
+      // Simulate usage patterns (replace with actual data collection)
+      const usagePatterns = {
+        documents_organized_last_24h: 150,
+        sync_operations_last_24h: 30,
+        most_active_category: 'Notes & Drafts'
+      };
+
+      // Sync efficiency monitoring (using circuit_breaker_state.json)
+      let syncEfficiency = {};
+      try {
+        const circuitBreakerState = await fs.readFile(path.join(SCRIPT_DIR, 'circuit_breaker_state.json'), 'utf-8');
+        const state = JSON.parse(circuitBreakerState);
+        syncEfficiency = {
+          circuit_breaker_status: state.status,
+          last_trip_time: state.lastTripTime || 'N/A',
+          failure_count: state.failureCount || 0
+        };
+      } catch (e) {
+        syncEfficiency.circuit_breaker_status = 'Unknown (file not found or invalid)';
+      }
+
+      // Error tracking and alerting (reading .gemini/logs)
+      let errorTracking = {
+        errors: 0,
+        warnings: 0,
+        recent_errors: []
+      };
+      const geminiLogDir = path.join(SCRIPT_DIR, '.gemini', 'logs');
+      try {
+        const logFiles = await fs.readdir(geminiLogDir);
+        for (const file of logFiles) {
+          const filePath = path.join(geminiLogDir, file);
+          const content = await fs.readFile(filePath, 'utf-8');
+          errorTracking.errors += (content.match(/ERROR/g) || []).length;
+          errorTracking.warnings += (content.match(/WARNING/g) || []).length;
+          // Add a simple way to get recent errors (last 5 lines of error logs)
+          if (file.includes('errors')) {
+            const lines = content.split('\n').filter(line => line.trim() !== '');
+            errorTracking.recent_errors.push(...lines.slice(-5));
+          }
+        }
+      } catch (e) {
+        errorTracking.status = 'Log directory not found or accessible';
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              time_range: timeRange,
+              performance_metrics: performanceMetrics,
+              usage_patterns: usagePatterns,
+              sync_efficiency: syncEfficiency,
+              error_tracking: errorTracking,
+              timestamp: new Date().toISOString()
+            }, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Failed to get system metrics: ${error.message}`);
     }
   }
 
