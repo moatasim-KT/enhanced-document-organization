@@ -243,6 +243,20 @@ class DocumentOrganizationMCP {
               },
               required: ['title', 'content']
             }
+          },
+          {
+            name: 'deduplicate_documents',
+            description: 'Search for and remove duplicate documents based on content',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                directory: {
+                  type: 'string',
+                  description: 'The directory to scan for duplicate documents'
+                }
+              },
+              required: ['directory']
+            }
           }
         ]
       };
@@ -330,6 +344,9 @@ class DocumentOrganizationMCP {
         case 'create_document':
           return await this.createDocument(args.title, args.content, args.category, args.auto_organize);
 
+        case 'deduplicate_documents':
+          return await this.deduplicateDocuments(args.directory);
+
         default:
           throw new Error(`Unknown tool: ${name}`);
       }
@@ -357,6 +374,31 @@ class DocumentOrganizationMCP {
     }
     
     return files;
+  }
+
+  async deduplicateDocuments(directory) {
+    try {
+      const result = execSync(
+        `node ${SCRIPT_DIR}/organize/deduplicate_module.js ${directory}`,
+        { encoding: 'utf-8', timeout: 600000 } // 10 minute timeout
+      );
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              operation: 'deduplicate_documents',
+              success: true,
+              output: result,
+              timestamp: new Date().toISOString()
+            }, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Deduplication failed: ${error.message}`);
+    }
   }
 
   getCategoryFromPath(filePath) {
