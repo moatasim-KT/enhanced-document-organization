@@ -4,31 +4,65 @@
 # CONSOLIDATED SYNC MODULE
 # ============================================================================
 # This module combines sync_manager.sh, sync_reliability_enhanced.sh, and circuit_breaker.sh
-# into a single, comprehensive sync management system
+# into a single, comprehensive sync management system.
+#
+# The module provvices
+
+# implementation, and automatic recovery mechanisms.
+#
+# Key features:
+# - Circuit breaker pattern to prevent repeated failures
+# - Error-specific handling and recovery strategies
+
+# - Cloud service he
+# - Comprehensive logging and sorting
+
+# Usage:
+#   ./sync_module.sh sync       ancements
+#   ./sync_module.sh health            # Check sync health
+
+#   ./sync_module.sh
+#
+# Options:
+#   --reset-circuit-breakers           # Rakers
+hours
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PARENT_DIR="$(dirname "$SCRIPT_DIR")"
-LOG_FILE="$PARENT_DIR/sync_module.log"
-CIRCUIT_BREAKER_FILE="$PARENT_DIR/circuit_breaker_state.json"
-CIRCUIT_BREAKER_LOG="$PARENT_DIR/circuit_breaker.log"
+SCRIPT_DIR="$(cd "$(dirname "${BA
+PARENT_DIR="$(dirname "$SCRIP
+LOG_og"
+CIRCUIT_BREAKER_FILE="$PARENT_DIR/circson"
+CIRCUIT_BREAKER_LOG="$PAR"
 
-# Load configuration
-source "$PARENT_DIR/config.env"
+# ion
 
-# ============================================================================
+
+# =====
 # CIRCUIT BREAKER IMPLEMENTATION
-# ============================================================================
+#=======
+ation
+# that's likely to fail, allowing ading
+# failures. It works ines:
+#
+# - CLOSED: Operatioounted
+# - OPEN: Operations are blocked, preventing further failures
+# - HALF-OPEN: A test operation is allowed t
+#
+
+# - Error-specific failure thresholds and imeouts
+# - Automatic state transitions baseds
+# - Support for multiple independent services
+# - Detailed logging and status reporting
 
 # Default thresholds
-DEFAULT_FAILURE_THRESHOLD=5
-DEFAULT_RESET_TIMEOUT=1800  # 30 minutes
-DEFAULT_HALF_OPEN_TIMEOUT=300  # 5 minutes
+DEFAULT_FAILURE_THRESHOLD=5       # N
+DEFAULT_RESET_TIMEOUT=1800        # 30 te
+DEFAULT_HALF_OPEN_TIMEOUT=300     # 5 minutes
 
-# Error type specific thresholds - use compatible array declaration
+# Error type specific thresholds - use con
 # Check if bash version supports associative arrays
-if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
+if [[ "$
     declare -A FAILURE_THRESHOLDS
     declare -A RESET_TIMEOUTS
 else
@@ -38,51 +72,94 @@ else
 fi
 
 # Function for logging
+# Writesfile
+#
+# Parameters:
+#   $1 to write
+#
+
+#   log "Starting sync process"
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" 
 }
 
-# Circuit breaker specific logging
-log_circuit_breaker() {
+#gging
+# Writes timestaog
+#g
+#
+# Para
+#)
+e
+#
+# Example:
+#   log_circuit_brea
+log_
     local level=$1
-    local message=$2
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$level] $message" | tee -a "$CIRCUIT_BREAKER_LOG"
+    
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ["
     log "[$level] [CircuitBreaker] $message"
 }
 
-# Initialize circuit breaker configuration
-initialize_circuit_breaker_config() {
-    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
-        # Set error-specific thresholds using associative arrays
-        FAILURE_THRESHOLDS["authentication"]=3
-        FAILURE_THRESHOLDS["conflict"]=4
-        FAILURE_THRESHOLDS["quota"]=2
-        FAILURE_THRESHOLDS["network"]=6
-        FAILURE_THRESHOLDS["configuration"]=3
-        FAILURE_THRESHOLDS["transient"]=8
-        FAILURE_THRESHOLDS["permanent"]=1
-        FAILURE_THRESHOLDS["partial_sync"]=5
+# Initialize
+# Sets up error-specific s
+# This all
+#
+# Error types and their specific configurs:
+# - authentication: Issues with credentials or permissions
+# - conflict: File conflicts or locking issues
+# - quota: Storage quota ors
+# - network: Connectivity or timeout issues
+# - configuration: Issues with son
+# - transient: T
+# - permanent: Serious errorstion
+# - partial_syd
+initialize_cg() {
+    if [[ "${BASH_VERSINF
+        # rrays
+      e
+ ies
+
+        FAILURE_THRESHOLDS["netwomporary
+        FAILURE_THRES
+        FAILURE_THREces
+    
+        FAILURE_THRESHOLDS["palve
         
-        # Set error-specific reset timeouts (in seconds)
-        RESET_TIMEOUTS["authentication"]=3600   # 1 hour
-        RESET_TIMEOUTS["conflict"]=1800         # 30 minutes
-        RESET_TIMEOUTS["quota"]=7200            # 2 hours
-        RESET_TIMEOUTS["network"]=900           # 15 minutes
-        RESET_TIMEOUTS["configuration"]=3600    # 1 hour
-        RESET_TIMEOUTS["transient"]=600         # 10 minutes
-        RESET_TIMEOUTS["permanent"]=86400       # 24 hours
-        RESET_TIMEOUTS["partial_sync"]=1200     # 20 minutes
+        # Set error-specific reset timeouts)
+        RESET_TIMEOUTS["authentication"]=3600   # 1 hour for auth issues
+        RESET_TIMEOUTS["conflict"]=1800         # 30 minu
+        RESET_TIMEOUs
+        RESEues
+        RESET_TIMEOUTS["cissues
+        RErrors
+        rors
+        RESET_TIMEOUTS["partial_sync"]=12ncs
     else
-        # Fallback for older bash versions - use functions instead of associative arrays
-        log_circuit_breaker "INFO" "Using compatibility mode for older Bash versions"
-    fi
+      
+ "
+i
 }
 
-# Initialize circuit breaker state file
-initialize_circuit_breaker() {
-    if [ ! -f "$CIRCUIT_BREAKER_FILE" ]; then
-        log_circuit_breaker "INFO" "Creating circuit breaker state file"
-        cat > "$CIRCUIT_BREAKER_FILE" << 'EOF'
+# Initialize circuit file
+# Cr
+# This file stores the state o
+#
+# The state file structure:
+# {
+#   "services": {
+#     "service_name": {
+#       "staopen",
+#       "failure_count":
+#       "l",
+#       
+#       "error_type": "error_category"
+#     }
+#   }
+# }
+
+    if [ ! -f "$CIRCUIT_BREAKEhen
+        log_circuit_breaker "INFO""
+        cat > "$CIRC
 {
   "services": {}
 }
@@ -90,28 +167,41 @@ EOF
     fi
 }
 
-# Get circuit breaker state for a service
+# Get circuiervice
+# Retrieves the current state e
+#
+# Parameters:
+#   $1 - Service name (e.g., "icloud", "g")
+#
+# Retuns:
+#pen"
+
+# Example:
+#   state=$(get_circuit_breaker_
+#   if [[ "$state" =hen
+#     echo "iCloud synked"
+#   fi
 get_circuit_breaker_state() {
-    local service=$1
     
-    initialize_circuit_breaker
     
-    if command -v jq >/dev/null 2>&1; then
-        local state=$(jq -r ".services[\"$service\"].state // \"closed\"" "$CIRCUIT_BREAKER_FILE" 2>/dev/null)
-        if [ -z "$state" ] || [ "$state" = "null" ]; then
+    
+    
+    en
+        local state=$(jq -r ".services[\"$
+        if [ -z "$state" ] || [ "en
             echo "closed"
         else
             echo "$state"
         fi
     else
-        # Fallback if jq is not available
-        if grep -q "\"$service\"" "$CIRCUIT_BREAKER_FILE" 2>/dev/null; then
-            if grep -q "\"state\":\"open\"" "$CIRCUIT_BREAKER_FILE" 2>/dev/null; then
+        # Fale
+        if grep -q "\"$service\"" en
+            if grep -q "\"statethen
                 echo "open"
-            elif grep -q "\"state\":\"half-open\"" "$CIRCUIT_BREAKER_FILE" 2>/dev/null; then
+            elif grep -q "\"state\":\"half-openthen
                 echo "half-open"
             else
-                echo "closed"
+            ed"
             fi
         else
             echo "closed"
@@ -119,328 +209,465 @@ get_circuit_breaker_state() {
     fi
 }
 
-# Get failure count for a service
-get_failure_count() {
+# Get ervice
+# Ree
+#
+#eters:
+
+#
+# Returns:
+#   Current failure eger
+#
+# Example:
+#   count=$(get_failure_count "icloud")
+#   echo "iCloud has failed $count times"
+get_() {
     local service=$1
     
     initialize_circuit_breaker
     
-    if command -v jq >/dev/null 2>&1; then
-        local count=$(jq -r ".services[\"$service\"].failure_count // 0" "$CIRCUIT_BREAKER_FILE" 2>/dev/null)
-        if [ -z "$count" ] || [ "$count" = "null" ]; then
+    if command -v jq
+        local cou
+        if [ -z "$count" ] || [ "$counten
             echo "0"
         else
             echo "$count"
         fi
     else
-        # Fallback if jq is not available
+        # Fallback if jq is not avle
         echo "0"
     fi
 }
 
 # Get last failure time for a service
-get_last_failure_time() {
-    local service=$1
+# Retrieves the timee
+#
+# Parameters:
+#   $1 - Service n")
+#
+# Returns:
+#   ISO 8601 timestamp of last failure or empty strs
+#
+# Example:
+#   last_time=$(get_last_failure_time "icloud")
+#   echo "Last iCl"
+get_last_failume() {
+    local sece=$1
     
     initialize_circuit_breaker
     
-    if command -v jq >/dev/null 2>&1; then
-        local time=$(jq -r ".services[\"$service\"].last_failure_time // \"\"" "$CIRCUIT_BREAKER_FILE" 2>/dev/null)
-        if [ -z "$time" ] || [ "$time" = "null" ]; then
-            echo ""
-        else
+    if command -v jqn
+        local time=$(jq -r ".services[\"$service\"].last_failure_time // \"\"" "$CIRCUIT_BREAKER_FILE" 2>/dell)
+        if [ -z "$time" ] || [ "$time" = "null" n
+            ec""
+        el
             echo "$time"
         fi
     else
-        # Fallback if jq is not available
-        echo ""
+ ble
+o ""
     fi
 }
 
-# Get error type for a service
+# Get error type forice
+# Retrieves the error type classific
+#
+# Paers:
+#   $1 - Service name (e.g., "icloud", "google_drive")
+#
+# Rens:
+#   Error type string (e.g., "network", "authen
+#
+# Ex
+#   error_type=$(get_circuit_breakcloud")
+#   echo "iCloud is experiencs"
 get_circuit_breaker_error_type() {
     local service=$1
     
     initialize_circuit_breaker
     
     if command -v jq >/dev/null 2>&1; then
-        local error_type=$(jq -r ".services[\"$service\"].error_type // \"\"" "$CIRCUIT_BREAKER_FILE" 2>/dev/null)
+        local error_type=$(jq -r ".services[\"$service\"].error_type // \"\"null)
         if [ -z "$error_type" ] || [ "$error_type" = "null" ]; then
             echo ""
         else
             echo "$error_type"
         fi
     else
-        # Fallback if jq is not available
+        ilable
         echo ""
     fi
 }
 
 # Update circuit breaker state
-update_circuit_breaker_state() {
+# Updates the state, failure count, and error typee
+#
+# Parameters:
+#   $1 - Ser")
+#   $2 - New state ("closed", "open", "half-open")
+#   $3 - Failure count (integer, optional, defaults to 0)
+#   $4 - Error type (string, optional, defaults to "unknown")
+#
+# Example:
+#   update_circuit_breaker_state "icloud" "open" 5 "network"
+#   # Opens the circuit breaker for iCloud after 5 network-related failures
+update_circuit
     local service=$1
     local new_state=$2
     local failure_count=${3:-0}
     local error_type=${4:-"unknown"}
     
-    initialize_circuit_breaker
+    ineaker
+   
+
     
-    local timestamp=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-    
-    if command -v jq >/dev/null 2>&1; then
-        local temp_file=$(mktemp)
-        jq --arg service "$service" \
+    if command -v jq >/de then
+        local temp_femp)
+     \
            --arg state "$new_state" \
            --arg timestamp "$timestamp" \
-           --argjson failure_count "$failure_count" \
-           --arg error_type "$error_type" \
+ 
+ \
            '
            .services[$service] = {
                "state": $state,
-               "failure_count": $failure_count,
-               "last_failure_time": $timestamp,
+    
+               "last_failure_time": $timesamp,
                "last_updated": $timestamp,
-               "error_type": $error_type
+        _type
            }
-           ' "$CIRCUIT_BREAKER_FILE" > "$temp_file" && mv "$temp_file" "$CIRCUIT_BREAKER_FILE"
+           ' "$CIRCUIT_BREAKER_FILE" > "E"
     else
-        # Fallback if jq is not available - create a simple JSON structure
-        local json_content=$(cat "$CIRCUIT_BREAKER_FILE" 2>/dev/null || echo '{"services":{}}')
+        # Fallbaure
+        loca}')
         # This is a very basic approach and not robust for complex JSON
-        # In production, jq should be required
-        echo "$json_content" | sed "s/\"services\":{/\"services\":{\"$service\":{\"state\":\"$new_state\",\"failure_count\":$failure_count,\"last_failure_time\":\"$timestamp\",\"last_updated\":\"$timestamp\",\"error_type\":\"$error_type\"},/" > "$CIRCUIT_BREAKER_FILE"
+        # 
+        
     fi
     
-    log_circuit_breaker "INFO" "Circuit breaker for $service updated to state: $new_state (failures: $failure_count, error: $error_type)"
-}
+ pe)"
 
-# Check if circuit breaker allows operation
-circuit_breaker_allows_operation() {
-    local service=$1
+
+# Check if circuit breaker allion
+# Determines if an operation s
+# Haiod
+#
+# Pa:
+#   $1 - Service name (e.g., "icloud", "go
+#
+# Returns:
+#   0 (success) if operation is allowed, 1 (
+#
+# Example:
+#   if circuit_ then
+#     # 
+#   else
+#     echo "iCloud sync is blocked by circuit breaker"
+#   fi
+circuit_br {
+    loca
     
     local state=$(get_circuit_breaker_state "$service")
-    local last_failure_time=$(get_last_failure_time "$service")
-    local error_type=$(get_circuit_breaker_error_type "$service")
+    locaice")
+    local error_type=$(get_circuit_b
     
     # Get reset timeout based on error type
     local reset_timeout=$(get_reset_timeout "$error_type")
     local half_open_timeout=$DEFAULT_HALF_OPEN_TIMEOUT
     
     case "$state" in
-        "closed")
-            return 0  # Allow operation
+        "clo)
+        tion
             ;;
-        "open")
-            # Check if it's time to transition to half-open
-            if [ -n "$last_failure_time" ]; then
-                local current_time=$(date -u +%s)
+      ")
+ n
+hen
+                local current_time=$(date +%s)
                 local failure_time
                 
-                # Handle different date formats for macOS and Linux
-                if [[ "$OSTYPE" == "darwin"* ]]; then
+    nux
+                if [[ "$OSTYPE" == "darwin"* ]
                     # macOS
-                    failure_time=$(date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$last_failure_time" "+%s" 2>/dev/null)
+        )
                 else
-                    # Linux and others
-                    failure_time=$(date -d "$last_failure_time" +%s 2>/dev/null)
+                    # Linux ahers
+                    failure_time=$(date -)
                 fi
                 
-                if [ -n "$failure_time" ] && [ $((current_time - failure_time)) -ge $reset_timeout ]; then
-                    # Transition to half-open state
-                    update_circuit_breaker_state "$service" "half-open" "$(get_failure_count "$service")" "$error_type"
-                    log_circuit_breaker "INFO" "Circuit breaker for $service transitioned to half-open state after timeout"
-                    return 0  # Allow one test operation
+                if [ -n "$failure_en
+                    # Transition to halfte
+                    update_circuit_b"
+                    log_circuit_brea
+                    return 0  # Allow oeration
                 fi
-            fi
             
-            log_circuit_breaker "WARN" "Circuit breaker for $service is open - operation blocked"
-            return 1  # Block operation
+           
+ 
+n
             ;;
         "half-open")
-            log_circuit_breaker "INFO" "Circuit breaker for $service is half-open - allowing test operation"
-            return 0  # Allow one test operation
+            log_circuition"
+    n
             ;;
         *)
-            return 0  # Default to allow
+        ow
             ;;
     esac
 }
 
 # Handle circuit breaker result after an operation
-handle_circuit_breaker_result() {
+# Updates the circuit breaker state based on the success oon
+# Implements the state transition logic of the circuitn
+#
+# Parameters:
+#   $1 - Service name (e.g., "icloud", "google_drive")
+#   $2 - Success flag (true/false)
+#   $3 - Err")
+#   $4onal)
+#
+ Example:
+#   # After successful operation
+#   handle_circuit_breaker_rtrue
+#
+peration
+#   handle_circuit_breaker_result "icwork" 3
+handle_circuit_bsult() {
     local service=$1
-    local success=$2
+    s=$2
     local error_type=${3:-"unknown"}
     local consecutive_failures=${4:-0}
     
-    local current_state=$(get_circuit_breaker_state "$service")
-    local current_count=$(get_failure_count "$service")
+    lo
+    e")
     
     # Get failure threshold based on error type
-    local failure_threshold=$(get_failure_threshold "$error_type")
+    local failure_threshold=$(get_failur")
     
-    if [ "$success" = true ]; then
+    if [hen
         # Operation succeeded
-        if [ "$current_state" = "half-open" ]; then
-            # If in half-open state and operation succeeded, close the circuit
-            update_circuit_breaker_state "$service" "closed" 0 "$error_type"
-            log_circuit_breaker "INFO" "Circuit breaker for $service closed after successful test operation"
-        elif [ "$current_state" = "open" ]; then
-            # This shouldn't happen normally, but handle it just in case
-            update_circuit_breaker_state "$service" "closed" 0 "$error_type"
-            log_circuit_breaker "INFO" "Circuit breaker for $service closed after successful operation while open"
-        elif [ $current_count -gt 0 ]; then
-            # Reset failure count on success if there were previous failures
-            update_circuit_breaker_state "$service" "closed" 0 "$error_type"
-            log_circuit_breaker "INFO" "Circuit breaker for $service reset failure count after success"
+        if [ "$cn
+      it
+ "
+
+        elif [ "$current_state"then
+            # Tht in case
+            update_circuit_breaker_state "e"
+    open"
+        elif [ $current_count -gt 0 ];en
+            # Reset failure count on success if tures
+            updaor_type"
+      ess"
         fi
     else
         # Operation failed
-        if [ "$current_state" = "half-open" ]; then
-            # If in half-open state and operation failed, reopen the circuit
-            update_circuit_breaker_state "$service" "open" $((current_count + 1)) "$error_type"
-            log_circuit_breaker "WARN" "Circuit breaker for $service reopened after failed test operation"
-        elif [ "$current_state" = "closed" ]; then
-            # Increment failure count
-            local new_count=$((current_count + 1))
-            
-            # If failure count exceeds threshold, open the circuit
-            if [ $new_count -ge $failure_threshold ]; then
-                update_circuit_breaker_state "$service" "open" $new_count "$error_type"
-                log_circuit_breaker "WARN" "Circuit breaker for $service opened after $new_count consecutive failures"
+        if [ "$current_state" = "h" ]; then
+            # If
+        
+            log_circuit_breaker "WARN"
+        elif [ "en
+      count
+  1))
+ 
+            # If failure countuit
+            if [ $n]; then
+                update_circuit_breaker_statpe"
+    s"
             else
-                update_circuit_breaker_state "$service" "closed" $new_count "$error_type"
-                log_circuit_breaker "INFO" "Circuit breaker for $service incremented failure count to $new_count"
-            fi
-        elif [ "$current_state" = "open" ]; then
+                update_circuit_breaker_state "$s"
+                log_circuit_"
+          fi
+    n
             # Update failure count while circuit is open
             update_circuit_breaker_state "$service" "open" $((current_count + 1)) "$error_type"
-            log_circuit_breaker "WARN" "Circuit breaker for $service recorded additional failure while open"
+            log_circuit_breaker "WARN" "Circ"
         fi
     fi
 }
 
-# Reset circuit breaker for a service
+# Reervice
+# Manually resets a circuit breakilures
+#
+rs:
+#   $1 - Service name (e.g., ")
+#
+# Example:
+#   "
+#   # Resets the iCloud circuit breakesed state
 reset_circuit_breaker() {
-    local service=$1
+    local servic=$1
     
-    update_circuit_breaker_state "$service" "closed" 0 "reset"
-    log_circuit_breaker "INFO" "Circuit breaker for $service manually reset"
+    "
+    log_circuit_breaker "INFO" "Circuit breake
 }
 
 # Reset all circuit breakers
-reset_all_circuit_breakers() {
-    log_circuit_breaker "INFO" "Resetting all circuit breakers"
+# Resets
+#
+# Example:
+#   reseeakers
+#   # Resets all circuit breakers to closed state
+reset_alers() {
+    log_circuit_breaker "INFO" "Resetting all circuit break
     
-    if command -v jq >/dev/null 2>&1; then
-        local services=$(jq -r '.services | keys[]' "$CIRCUIT_BREAKER_FILE" 2>/dev/null)
+    ifen
+    
         
-        if [ -n "$services" ]; then
-            for service in $services; do
-                reset_circuit_breaker "$service"
+ n
+
+                reset_circuit_break"
             done
         else
-            log_circuit_breaker "INFO" "No circuit breakers to reset"
+    
         fi
     else
-        log_circuit_breaker "WARN" "jq is required for resetting all circuit breakers"
+    breakers"
     fi
 }
 
-# Get circuit breaker status report
-get_circuit_breaker_status() {
+# Get circuit breaker status rt
+# Generates a human-readable report of 
+#
+# Returns:
+#   Multrt
+#
+# Example:
+#   status_report=$(g
+#   echort"
+get_
     initialize_circuit_breaker
     
-    log_circuit_breaker "INFO" "Generating circuit breaker status report"
-    
-    if command -v jq >/dev/null 2>&1; then
-        local services=$(jq -r '.services | keys[]' "$CIRCUIT_BREAKER_FILE" 2>/dev/null)
+ rt"
+
+    if command -v jq >/dev/nu
+        local servil)
         
-        echo "Circuit Breaker Status Report"
-        echo "============================"
-        echo "Generated at: $(date '+%Y-%m-%d %H:%M:%S')"
-        echo ""
+    
+        echo "==============="
+        echo "Gener)"
+    
         
         if [ -z "$services" ]; then
-            echo "No circuit breaker states recorded."
+        ed."
             return 0
         fi
         
-        echo "Service | State | Failures | Last Failure | Error Type"
-        echo "--------|-------|----------|--------------|------------"
+        ec Type"
         
-        for service in $services; do
-            local state=$(jq -r ".services[\"$service\"].state" "$CIRCUIT_BREAKER_FILE")
-            local failures=$(jq -r ".services[\"$service\"].failure_count" "$CIRCUIT_BREAKER_FILE")
-            local last_failure=$(jq -r ".services[\"$service\"].last_failure_time" "$CIRCUIT_BREAKER_FILE")
-            local error_type=$(jq -r ".services[\"$service\"].error_type" "$CIRCUIT_BREAKER_FILE")
+        
+        for seres; do
+            local staE")
+        ILE")
+    LE")
+            local error_type=$(jq -r ".services[\"$servFILE")
             
-            echo "$service | $state | $failures | $last_failure | $error_type"
-        done
+ pe"
+      done
     else
-        echo "jq is required for detailed circuit breaker status reporting"
+        echo "j"
     fi
 }
 
 # Get failure threshold for an error type
-get_failure_threshold() {
+# Returns the configured failure threshold for the specified error typ
+#
+# Para:
+#   cation")
+#
+# Returns:
+#   Failure threshold as integer
+#
+# Example:
+#   threshold=$(
+#   ec"
+get_
     local error_type=$1
     
-    if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
-        echo "${FAILURE_THRESHOLDS[$error_type]:-$DEFAULT_FAILURE_THRESHOLD}"
+    n
+        echo "${FAILURE_THRESHOLDS[$eESHOLD}"
     else
         # Fallback for older bash versions
         case "$error_type" in
             "authentication") echo "3" ;;
             "conflict") echo "4" ;;
-            "quota") echo "2" ;;
-            "network") echo "6" ;;
-            "configuration") echo "3" ;;
+            "quo ;;
+        
+            "configuration;;
             "transient") echo "8" ;;
-            "permanent") echo "1" ;;
-            "partial_sync") echo "5" ;;
-            *) echo "$DEFAULT_FAILURE_THRESHOLD" ;;
+        " ;;
+            "partial_sync") e "5" ;;
+            *) echo "$DEFAULT_FAILUR
         esac
     fi
 }
 
 # Get reset timeout for an error type
-get_reset_timeout() {
+# Returns the configured reset timeout for type
+#
+# Parameters:
+#   $1 - Error type (e.g., "network", "authentication")
+#
+# Returns:
+#   Reset 
+#
+# Example:
+#   timeout=$(get_reset_timeout "network")
+#   echo "Network errors will retry after $t
+get_rese{
     local error_type=$1
     
     if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
-        echo "${RESET_TIMEOUTS[$error_type]:-$DEFAULT_RESET_TIMEOUT}"
+        echo "${RESET_TIMEOUTS[$error_type]:-$DEFAULT_RESET_TIME
     else
         # Fallback for older bash versions
-        case "$error_type" in
-            "authentication") echo "3600" ;;  # 1 hour
-            "conflict") echo "1800" ;;        # 30 minutes
-            "quota") echo "7200" ;;           # 2 hours
+        case "$error
+            r
+            "conflict") echo "1800" ;;        # 30 miutes
+            "quota") echo "7200" ;;           #s
             "network") echo "900" ;;          # 15 minutes
-            "configuration") echo "3600" ;;   # 1 hour
-            "transient") echo "600" ;;        # 10 minutes
-            "permanent") echo "86400" ;;      # 24 hours
-            "partial_sync") echo "1200" ;;    # 20 minutes
-            *) echo "$DEFAULT_RESET_TIMEOUT" ;;
+            "configuur
+          s
+      
+ inutes
+
         esac
     fi
 }
 
-# ============================================================================
+# =================================================
 # SYNC RELIABILITY FUNCTIONS
-# ============================================================================
+# ==================================================================
+# These functiones,
+# handuring
+# dae:
+#
+# - Cloud service accessiity checks
+# - hanisms
+# - Error classification and hand
+# - Timeout management
+# - Sync hub structure validation
 
 # Check if Google Drive is accessible
+# Verifies that 
+#
+# Returns:
+#   0 (success) if Google Drive iserwise
+#
+# Ex
+#   if check_gdrive; then
+#     echo "Google Drive is accessible"
+#   else
+#     echo "Google Drive is not accessible"
+#   fi
 check_gdrive() {
-    log "Checking Google Drive accessibility..."
+    log "Checkin."
     
-    if [[ ! -d "$GDRIVE_PATH" ]]; then
+    if [[ ! -d "$GDRIVE_PA then
         log "Google Drive path not found: $GDRIVE_PATH"
-        return 1
+        
     fi
     
     # Try to list files in Google Drive
-    if timeout 10 ls -la "$GDRIVE_PATH" > /dev/null 2>&1; then
+    if timeout 10 ls -la "$GDRIV
         log "Google Drive is accessible"
         return 0
     else
@@ -449,38 +676,57 @@ check_gdrive() {
     fi
 }
 
-# Check if iCloud is accessible
+# Check if iClssible
+# Verifiese
+#
+# Returns:
+#   0 (success) if iCloud is accessible, 1 (failure) othe
+#
+# Example:
+#   if check_icloud; then
+#     echo "iCloud is accessible"
+#   else
+#     echo "iCloud is not accessible"
+#   fi
 check_icloud() {
-    log "Checking iCloud accessibility..."
+    log "Checking iC
     
     if [[ ! -d "$ICLOUD_PATH" ]]; then
         log "iCloud path not found: $ICLOUD_PATH"
         return 1
     fi
     
-    # Try to list files in iCloud
-    if timeout 10 ls -la "$ICLOUD_PATH" > /dev/null 2>&1; then
-        log "iCloud is accessible"
+    # 
+ hen
+le"
         return 0
     else
-        log "iCloud is not responding"
+        log "iCloud is not respon
         return 1
     fi
 }
 
-# Ensure local sync hub exists
-ensure_sync_hub() {
-    log "Ensuring local sync hub exists..."
+sts
+# Creates the local sync hub director't exist
+#
+# Returns:
+#   0 (success) always
+#
+# Example:
+#   ensure_sync_hub
+#   # Creates sy
+ensure {
+    log "Ens"
     
-    if [[ ! -d "$SYNC_HUB" ]]; then
+en
         log "Creating local sync hub: $SYNC_HUB"
-        mkdir -p "$SYNC_HUB"
+        mkdir -p"
     fi
     
-    # Create basic folder structure if it doesn't exist
-    for dir in "📚 Research Papers" "🤖 AI & ML" "💻 Development" "🌐 Web Content" "📝 Notes & Drafts"; do
+    # Create basic folder structure if it
+    for dir 
         if [[ ! -d "$SYNC_HUB/$dir" ]]; then
-            log "Creating directory: $dir"
+    
             mkdir -p "$SYNC_HUB/$dir"
         fi
     done
@@ -488,390 +734,497 @@ ensure_sync_hub() {
     log "Local sync hub is ready"
 }
 
-# Force download iCloud files
-force_icloud_download() {
-    log "Forcing download of iCloud files..."
+# Force download
+# Attelocal
+# Usnot
+#
+# Returns:
+#   il
+#
+# Example:
+#   nload
+#   # Forces download of i files
+force_icloud_dowd() {
+    log "Forcing..."
     
     if [[ ! -d "$ICLOUD_PATH" ]]; then
-        log "iCloud path not found: $ICLOUD_PATH"
-        return 1
+        log "iCloud path PATH"
+    1
     fi
     
-    # Use brctl to force download if available
-    if command -v brctl &> /dev/null; then
-        log "Using brctl to force download..."
-        brctl download "$ICLOUD_PATH" &> /dev/null || true
-        
+    # Use brctl
+    n
+        log "Using brctl to force download
+        brctl download "$ICLOUD_PAue
+     
         # Find and download .icloud files
-        find "$ICLOUD_PATH" -name "*.icloud" -exec brctl download {} \; &> /dev/null || true
-    else
-        log "brctl not available, trying alternative method..."
+ 
+se
+        log "brctl not availabl"
         
-        # Alternative method: touch files to force download
-        find "$ICLOUD_PATH" -type f -name "*.icloud" -exec touch {} \; &> /dev/null || true
+        # Alternative method: tou
+    
     fi
     
-    log "iCloud download attempt completed"
+    log "iCloud download attemleted"
 }
 
 # Wait for Google Drive to be ready
+# Reies
+#
+# Returns:
+#   0 (success) ts
+#   empts
+#
+# Example:
+#   then
+#     echo "Googlec"
+#   else
+#     echo "Google Drive is not available"
+#   fi
 wait_for_gdrive() {
     log "Waiting for Google Drive to be ready..."
     
-    local max_attempts=10
-    local attempt=1
+    local max_at
+    local atempt=1
     
-    while [[ $attempt -le $max_attempts ]]; do
-        log "Attempt $attempt of $max_attempts"
+    while  do
+      "
         
-        if check_gdrive; then
+        if check_gdrive;
             log "Google Drive is ready"
             return 0
         fi
         
         log "Waiting 5 seconds before next attempt..."
         sleep 5
-        ((attempt++))
+        ((attemp
     done
     
-    log "Google Drive not ready after $max_attempts attempts"
-    return 1
+    log "Gpts"
+    re
 }
 
 # Wait for iCloud to be ready
+# Repeatedly checks iCloud accessibtries
+#
+# Returns:
+#
+ attempts
+#
+# Example:
+#   if wait_fohen
+#     echo "iCloud is ready for sync"
+e
+#     ech
+#   fi
 wait_for_icloud() {
     log "Waiting for iCloud to be ready..."
     
-    local max_attempts=10
-    local attempt=1
+10
+    locatempt=1
     
     while [[ $attempt -le $max_attempts ]]; do
-        log "Attempt $attempt of $max_attempts"
+s"
         
-        if check_icloud; then
-            log "iCloud is ready"
+        if check_icloudn
+            log "iCloud i"
             return 0
         fi
-        
-        log "Waiting 5 seconds before next attempt..."
-        sleep 5
+      
+ "
+p 5
         ((attempt++))
     done
     
-    log "iCloud not ready after $max_attempts attempts"
+"
     return 1
 }
 
-# Perform reliable sync with Google Drive
+# Perform reliave
+# Synchrrive
+# with circuit breaker protec
+#
+# Returns:
+#   0 
+#   er
+#
+# Example:
+#   
+#     echo "Google Dri"
+#   else
+#     echo "Google Drive 
+#   fi
 sync_gdrive() {
-    log "Performing reliable sync with Google Drive..."
+    log "Performing reli.."
     
-    # Check circuit breaker before attempting sync
-    if ! circuit_breaker_allows_operation "google_drive"; then
-        log "Circuit breaker is open for Google Drive - skipping sync"
+    # Check circuit brync
+    if ! circuit_breaker_allows_operatn
+        log "Circuit breaker is open for G"
         return 1
     fi
     
-    # Wait for Google Drive to be ready
-    if ! wait_for_gdrive; then
-        log "Skipping Google Drive sync due to accessibility issues"
-        # Record failure in circuit breaker
-        handle_circuit_breaker_result "google_drive" false "network" 1
+    # Wait foready
+    if ! w
+        log "Skipping Google Drive sync due  issues"
+        # Record failuer
+        handle_cir" 1
         return 1
     fi
     
-    # Ensure local sync hub exists
+sts
     ensure_sync_hub
-    
-    # Try sync with increased timeout
-    log "Running Unison sync with Google Drive..."
-    if timeout 300 unison -batch -ui text -times -prefer newer google_drive; then
-        log "Google Drive sync completed successfully"
-        # Record success in circuit breaker
-        handle_circuit_breaker_result "google_drive" true
-        return 0
-    else
-        local exit_code=$?
-        log "Google Drive sync failed with exit code $exit_code"
-        
-        # Classify error type
-        local error_type="transient"
-        if [ $exit_code -eq 124 ] || [ $exit_code -eq 137 ]; then
-            error_type="timeout"
-        elif [ $exit_code -eq 1 ]; then
-            # Check error output for specific patterns
-            if grep -q "permission denied\|unauthorized\|auth" "$LOG_FILE"; then
-                error_type="authentication"
-            elif grep -q "conflict\|locked\|deadlock" "$LOG_FILE"; then
-                error_type="conflict"
-            elif grep -q "quota\|limit\|space" "$LOG_FILE"; then
-                error_type="quota"
-            fi
-        fi
-        
-        # Get current failure count
-        local failure_count=$(get_failure_count "google_drive")
-        failure_count=$((failure_count + 1))
-        
-        # Try again with more aggressive options
-        log "Retrying with fallback options..."
-        if timeout 300 unison -batch -ui text -times -prefer newer -retry 5 google_drive; then
-            log "Google Drive sync retry completed successfully"
-            # Record success in circuit breaker
-            handle_circuit_breaker_result "google_drive" true
-            return 0
-        else
-            log "Google Drive sync retry also failed"
-            # Record failure in circuit breaker
-            handle_circuit_breaker_result "google_drive" false "$error_type" $failure_count
-            return 1
-        fi
+     # Tr"$@"n
+main functioain 
+
+# Run m
+}sac
+    e;;           
+  1       exitge
+        show_usa       "
+  dmman $co command: "Unknown    echo            *)
+  
+  ;     ;tus
+       _breaker_stay_circuit    displa)
+        status;
+               ;    r_status
+ kecircuit_brea display_        
+   breakersll_circuit_     reset_ait)
+       rcut-ci  rese       ;;
+         
+  check_health           h)
+    healt  ;;
+              "$@"
+ nc   run_sy         ync)
+ n
+        s$command" ie "
+    cas shift
+       and="$1"
+ commocal l    
+   
     fi
-}
+  exit 1     w_usage
+  shohen
+       -eq 0 ]]; t"$#" 
+    if [[ ) {
+main(ealth checkRuns h# alth
+#   main he
+#   mmand
+#co Runs sync    #c
+#syn#   main  Example:
 
-# Perform reliable sync with iCloud
-sync_icloud() {
-    log "Performing reliable sync with iCloud..."
-    
-    # Check circuit breaker before attempting sync
-    if ! circuit_breaker_allows_operation "icloud"; then
-        log "Circuit breaker is open for iCloud - skipping sync"
-        return 1
-    fi
-    
-    # Force download iCloud files
-    force_icloud_download
-    
-    # Wait for iCloud to be ready
-    if ! wait_for_icloud; then
-        log "Skipping iCloud sync due to accessibility issues"
-        # Record failure in circuit breaker
-        handle_circuit_breaker_result "icloud" false "network" 1
-        return 1
-    fi
-    
-    # Ensure local sync hub exists
-    ensure_sync_hub
-    
-    # Try sync with increased timeout
-    log "Running Unison sync with iCloud..."
-    if timeout 300 unison -batch -ui text -times -prefer newer icloud; then
-        log "iCloud sync completed successfully"
-        # Record success in circuit breaker
-        handle_circuit_breaker_result "icloud" true
-        return 0
-    else
-        local exit_code=$?
-        log "iCloud sync failed with exit code $exit_code"
-        
-        # Classify error type
-        local error_type="transient"
-        if [ $exit_code -eq 124 ] || [ $exit_code -eq 137 ]; then
-            error_type="timeout"
-        elif [ $exit_code -eq 1 ]; then
-            # Check error output for specific patterns
-            if grep -q "permission denied\|unauthorized\|auth" "$LOG_FILE"; then
-                error_type="authentication"
-            elif grep -q "conflict\|locked\|deadlock" "$LOG_FILE"; then
-                error_type="conflict"
-            elif grep -q "quota\|limit\|space" "$LOG_FILE"; then
-                error_type="quota"
-            fi
-        fi
-        
-        # Get current failure count
-        local failure_count=$(get_failure_count "icloud")
-        failure_count=$((failure_count + 1))
-        
-        # Try again with more aggressive options
-        log "Retrying with fallback options..."
-        if timeout 300 unison -batch -ui text -times -prefer newer -retry 5 icloud; then
-            log "iCloud sync retry completed successfully"
-            # Record success in circuit breaker
-            handle_circuit_breaker_result "icloud" true
-            return 0
-        else
-            log "iCloud sync retry also failed"
-            # Record failure in circuit breaker
-            handle_circuit_breaker_result "icloud" false "$error_type" $failure_count
-            return 1
-        fi
-    fi
-}
+#guments
+#mand line ar
+#   ComParameters:
+# s
+#ne argumentcommand lit processes  script thaoint for thentry pion
+# En funct
+# Maiker_config
+breacircuit_itialize_on
+innfiguratir corcuit breakealize the ciIniti
 
-# Display circuit breaker status
-display_circuit_breaker_status() {
-    log "Circuit Breaker Status:"
-    get_circuit_breaker_status | while read -r line; do
-        log "  $line"
-    done
-}
+# =========================================================================== =IPT
+# SCR====
+# MAIN=====================================================================
 
-# Reset circuit breakers if requested
-reset_circuit_breakers() {
-    if [[ "$1" == "--reset-circuit-breakers" ]]; then
-        log "Resetting all circuit breakers..."
-        reset_circuit_breaker "icloud"
-        reset_circuit_breaker "google_drive"
-        log "All circuit breakers have been reset"
-        return 0
-    fi
-    return 1
-}
-
-# ============================================================================
-# MAIN FUNCTIONS
-# ============================================================================
-
-# Run sync with reliability enhancements
-run_sync() {
-    log "Starting enhanced sync process..."
-    
-    # Initialize circuit breaker
-    initialize_circuit_breaker_config
-    initialize_circuit_breaker
-    
-    # Check if reset is requested
-    if [[ "$#" -gt 0 ]] && reset_circuit_breakers "$1"; then
-        display_circuit_breaker_status
-        return 0
-    fi
-    
-    # Display current circuit breaker status
-    display_circuit_breaker_status
-    
-    # Ensure local sync hub exists
-    ensure_sync_hub
-    
-    # Check cloud services
-    check_icloud
-    check_gdrive
-    
-    # Force download iCloud files
-    force_icloud_download
-    
-    # Perform syncs
-    sync_icloud
-    sync_gdrive
-    
-    # Display final circuit breaker status
-    display_circuit_breaker_status
-    
-    log "Enhanced sync process completed"
-}
-
-# Check health of sync services
-check_health() {
-    log "Checking sync health..."
-    
-    # Initialize circuit breaker
-    initialize_circuit_breaker_config
-    initialize_circuit_breaker
-    
-    # Display circuit breaker status
-    display_circuit_breaker_status
-    
-    # Check cloud services
-    check_icloud
-    check_gdrive
-    
-    # Check for problematic files
-    log "Checking for problematic files..."
-    
-    # Check iCloud
-    if [[ -d "$ICLOUD_PATH" ]]; then
-        local problematic_files=$(find "$ICLOUD_PATH" -name "*:*" -o -name "*\"*" -o -name "*<*" -o -name "*>*" -o -name "*|*" 2>/dev/null | head -5)
-        if [[ -n "$problematic_files" ]]; then
-            log "WARNING: Found files with problematic characters in iCloud:"
-            echo "$problematic_files" | while read -r file; do
-                log "  - $(basename "$file")"
-            done
-        else
-            log "No problematic files found in iCloud"
-        fi
-    fi
-    
-    # Check Google Drive
-    if [[ -d "$GDRIVE_PATH" ]]; then
-        local problematic_files=$(find "$GDRIVE_PATH" -name "*:*" -o -name "*\"*" -o -name "*<*" -o -name "*>*" -o -name "*|*" 2>/dev/null | head -5)
-        if [[ -n "$problematic_files" ]]; then
-            log "WARNING: Found files with problematic characters in Google Drive:"
-            echo "$problematic_files" | while read -r file; do
-                log "  - $(basename "$file")"
-            done
-        else
-            log "No problematic files found in Google Drive"
-        fi
-    fi
-    
-    # Check disk space
-    log "Checking disk space..."
-    df -h | grep -E "Filesystem|/$"
-    
-    log "Health check completed"
-}
-
-# Show usage information
-show_usage() {
-    cat << EOF
-Usage: $(basename "$0") [command] [options]
-
-Commands:
-  sync                Run sync process with reliability enhancements
-  health              Check sync health
-  reset-circuit       Reset circuit breakers
-  status              Show sync and circuit breaker status
-
-Options:
-  --reset-circuit-breakers  Reset all circuit breakers
-  --force                   Force sync even during quiet hours
-
-Examples:
-  $(basename "$0") sync
-  $(basename "$0") health
-  $(basename "$0") reset-circuit
-  $(basename "$0") status
+# ===
 EOF
+}tatus"$0") sbasename   $(t-circuit
+"$0") reseame senbahealth
+  $(") ame "$0
+  $(basenc "$0") synmena $(base:
+ 
+
+Examplesiet hoursng quc even duri syn    Force    e            --forcbreakers
+ circuit et all Resrs  rcuit-breake--reset-cions:
+  Optiatus
+
+er stak brecircuitsync and w       Shoatus        eakers
+  stt brReset circui  uit     irct-clth
+  reseck sync hea         Chealth      hes
+ mentenhanceliability  re withessn sync proc Ru               sync:
+  mandss]
+
+Comptiond] [o0") [commanname "$$(base
+Usage:  cat << EOF {
+   age()usw_
+shoformatione in usagplays
+#   # Dis_usagehowe:
+#   spl#
+# Examtions
+sage instrucith u text wisplays helpion
+# Dformatsage inhow u"
 }
 
-# ============================================================================
-# MAIN SCRIPT
-# ============================================================================
+# Smpletedcheck co "Health     log
 
-# Initialize the circuit breaker configuration
-initialize_circuit_breaker_config
-
-# Main function
-main() {
-    if [[ "$#" -eq 0 ]]; then
-        show_usage
-        exit 1
+    m|/$"lesysteE "Firep -h | gf -.."
+    d disk space.heckingog "Cce
+    l disk spaeck    # Ch
+  fi
+         fi
+    "
+ eGoogle Drives found in tic filproblemaNo    log "        else
+            done
+     "
+     "$file")basename "  - $(    log        
+    oile; dle read -r fwhifiles" | ic_$problemat   echo "
+         Drive:"s in Google c characterblematiwith prod files oun: F"WARNINGog   l      n
+    " ]]; theatic_files "$problem[[ -nf  i
+       head -5)/dev/null | *" 2>"*|ame "*>*" -o -no -name " -"*<* -o -name*\"*"  -o -name """*:*H" -name ATGDRIVE_Pfind "$iles=$(c_flematical problo       ]; then
+ ATH" ]"$GDRIVE_Pd 
+    if [[ -gle Driveck Goo
+    # Che
+       fi
+        fi"
+ nd in iCloud files fouematic probl"No     log     else
+          e
+       don"
+      "$file")ame $(basen  log "  -            o
+    de;fil -r  read" | whileileslematic_fprobcho "$         e  loud:"
+ s in iCterharacoblematic ch pritund files w Fo "WARNING:     log    n
+   ]; theles" ]ematic_fi "$probl [[ -n        if5)
+ad -/null | he|*" 2>/dev-name "*-o  "*>*" name*" -o --name "*<*" -o \"me "*" -o -name "*:*" -naLOUD_PATHd "$IC(fins=$atic_fileoblemlocal pr      ]]; then
+  ATH" UD_P -d "$ICLOf [[   ick iCloud
+  Che
+    #   "
+ ic files...mator probleking f log "Checles
+   ic filematfor prob Check  #e
+    
+   rivgd  check_ud
+  eck_iclo
+    chrvices se Check cloud    #   
+r_status
+ t_breakeay_circui  displ  er status
+reak circuit bay    # Displker
+    
+it_brearcuze_cinitiali   ier_config
+ reak_circuit_binitializereaker
+     bze circuitali# Initi
+    
+    "alth... hesyncing og "Check   l) {
+ k_health(
+checesvicf sync seralth oreports heks and hec
+#   # Clth_hea  checke:
+# 
+#
+# Exampls statureports and nc servicescks on sy health chemses
+# Perfor sync servicealth of
+# Check heted"
+}
+omplnc process cEnhanced syog "   
+    lstatus
+ _breaker__circuit   display
+ tus breaker stainal circuitsplay f   # Diive
+    
+    sync_gdrud
+ nc_iclo    sys
+ sync Perform    
+    #oad
+_downlce_icloud  forud files
+  ownload iCloce d  # For
+    
+  _gdrivecheck
+    check_icloud  ces
+  ervid slouheck c
+    # C_hub
+    sync  ensure_ exists
+   hubocal synce l    # Ensur  
+s
+  ker_statuit_breairculay_cus
+    disp statcuit breakercirurrent lay c Disp
+    #    
     fi
-    
-    local command="$1"
-    shift
-    
-    case "$command" in
-        sync)
-            run_sync "$@"
-            ;;
-        health)
-            check_health
-            ;;
-        reset-circuit)
-            reset_all_circuit_breakers
-            display_circuit_breaker_status
-            ;;
-        status)
-            display_circuit_breaker_status
-            ;;
-        *)
-            echo "Unknown command: $command"
-            show_usage
-            exit 1
-            ;;
-    esac
+n 0   returatus
+     er_steakuit_brcircisplay_       d
+ ; thenakers "$1"_breeset_circuit& rgt 0 ]] &$#" -  if [[ "ted
+  requesset is ck if re   # Che 
+ reaker
+   rcuit_bize_cinitial    ifig
+onbreaker_cuit_tialize_circker
+    iniit breaize circuitial 
+    # In"
+   s...cesd sync proting enhance"Star   log c() {
+ yn_sunync
+rs srforms and peakerbret  circuiesets Rers"
+#   #reakt-beset-circui"--rc un_syn
+#   rcements
+# enhan reliabilitysync withrms   # Perfoync
+# un_se:
+#   rplamrs)
+#
+# Exreaket-bet-circuig., --res (e.umentsline argnal command 1 - Optio  $ters:
+# 
+# Parametures
+#ility feah all reliabization witm synchronerfortion to pain func
+# Mtsmenancety enhreliabiliith n sync w
+
+# Ru============================================================================ONS
+# IN FUNCTI=
+# MA===========================================================================}
+
+# turn 1
+   re
+  0
+    fi     returnt"
+   een resehave bit breakers cuirog "All c"
+        lve"google_dri _breakeritt_circuse re
+        "icloud"breakeruit_  reset_circ"
+      ..t breakers.cuiing all cir"Resett     log ; then
+   rs" ]]breakeet-circuit- == "--res [[ "$1"if) {
+    eakers(uit_brt_circrs
+resecuit breakets all cirese"
+#   # Rrst-breaket-circuiese"--rakers t_brecircui reset_ample:
+#  ise
+#
+# Exerw othperformed, 1as eset w#   0 if rns:
+
+#
+# Returset flagck for reent to che line argumand - Comm#   $1ters:
+
+# Parameed
+#ag is providflrs breaket-set-circui-rers if the -akecircuit bre all etsd
+# Resteif requesers eakbret circuit 
+# Resne
 }
 
-# Run main function
-main "$@"
+    do""  $line log 
+       ine; doead -r lus | while reaker_statt_circuit_br    ge:"
+tusreaker Stacuit Bog "Cir  l) {
+  tus(stait_breaker_circulay_
+dispus reporttatit breaker says circu
+#   # Displstatusker_cuit_breaisplay_cirmple:
+#   drs
+#
+# Exaeaket brall circuiof ent status he currws t
+# Shousker statcircuit brea
+# Display 
+}
+ fi
+    fi       turn 1
+  re         ure_count
+ " $failr_typerro false "$e""icloudt ker_resulit_breale_circu   hand       breaker
+  in circuit ailure Record f       #      "
+also failedsync retry oud log "iCl         lse
+          eturn 0
+      re      
+ d" trueiclousult "reaker_recircuit_bndle_    ha     
+   it breakercucess in cir suc # Record         sfully"
+  d succestecomplery oud sync ret "iCllog          then
+    icloud; 5r -retryewe nfermes -preui text -ti -on -batchismeout 300 un       if ti..."
+ ack options fallbwithng "Retryi   log     ions
+ essive opt aggrwith moregain   # Try a             
+ 1))
+ount + e_cfailur((ount=$ failure_c  ")
+     udount "iclot_failure_ct=$(gee_coun failur local
+       lure countt fait curren    # Ge 
+    fi
+       
+                 fiota"
+   ype="quor_t  err           n
+   ; theFILE"ce" "$LOG_\|spaota\|limit-q "qurep lif g          e"
+  e="conflictror_typ er           ; then
+    _FILE"" "$LOG\|deadlockct\|locked "conflirep -q      elif g
+      tion""authentica error_type=             
+  ; then$LOG_FILE"h" "rized\|autnauthonied\|uion depermiss"q ep -     if gr    atterns
+   ecific por sp ferror outputk hec       # C    
+ nthee -eq 1 ];  [ $exit_cod   elif     
+imeout"r_type="t        erron
+    7 ]; the 13ode -eq$exit_c[ ] || eq 124 de -[ $exit_coif     ent"
+    "transipe=al error_ty  loctype
+      y error lassif    # C        
+"
+    de $exit_coth exit codewic failed  syn"iCloud   log    _code=$?
+  al exit  loclse
+      
+    eurn 0 ret
+       " trueoud"iclker_result ircuit_brea handle_cer
+       t breakin circuisuccess cord # Re    "
+    lysful succesed complet"iCloud syncog   l     en
+ ; ther icloudewrefer ns -pmext -titebatch -ui 00 unison -imeout 3 t"
+    ifloud...ync with iCing Unison sRunn  log "
+  eoutimreased t incc withy syn   # Trhub
+    
+ nsure_sync_  eexists
+  al sync hub sure loc    # En   
+i
+ 1
+    f   return 
+     " 1networkd" false " "iclour_resultbreakecuit_ir_cle       hander
+ rcuit breakre in ciailurd f# Reco   "
+     ty issueslibisidue to acces sync ing iCloudg "Skipp        lohen
+loud; tait_for_icif ! wy
+     to be readt for iCloud
+    # Wai    wnload
+loud_doicforce_les
+    d fid iClounloa dow  # Force    
+  
+ 1
+    fi  return
+      ing sync" skippr iCloud - foer is openbreakcuit   log "Cirn
+      "; theloud"icperation _oowsll_akeruit_brea   if ! circng sync
+ re attemptifoer be breakck circuit# Che
+    
+    iCloud..."ync with  reliable srforming "Pelogd() {
+    c_iclou
+synfi  led"
+# c fai"iCloud syno e
+#     ech#   els
+lly"successfuc completed ynoud siCl    echo "d; then
+# iclou#   if sync_le:
+#
+# Exampreaker
+uit bcked by circor is blofails if sync 1 (failure) 
+#   sfullysuccesompletes  sync c(success) if 0 ns:
+#   Returtries
+#
+#omatic re and authandling,on, error r protectieakecircuit br
+# with d iCloub andsync huen local  files betwechronizesCloud
+# Sync with ile synreliaberform 
+# P
+    fi
+}
+ fi  1
+         return         ount
+failure_c" $yper_trose "$erve" fal_drile "googresulter_akcuit_brele_cirand         hker
+   it breaculure in cird fai   # Recor   ed"
+      failetry also c rrive syne D log "Googl      se
+         el
+    eturn 0   r   true
+      e" _drivogle"golt ker_resureauit_ble_circ      handaker
+      cuit breir cs inrd succesReco      # 
+      ccessfully" suletedc retry compynve sDriGoogle     log "     n
+   ve; therie_d googlretry 5er -ew -prefer n -timesxt teh -uison -batc0 unieout 30f tim  i.."
+      tions.k opth fallbacg wiing "Retry     lo
+   sive optionsmore aggres again with      # Try         
+))
+  ount + 1re_cilufa$((lure_count=    fai   
+ ")ive_drgooglere_count "_failuount=$(get failure_c local   ount
+    e cfailurnt # Get curre      
+        fi
+    
+               fi   "
+uota"q error_type=        hen
+       E"; t$LOG_FIL\|space" "a\|limit "quot-qgrep   elif         lict"
+  confe="or_typ   err            hen
+ LE"; tOG_FI"$Ldlock" ocked\|deact\|lli -q "confepf gr     eli"
+       cationthenti"au_type=ror  er        
+      then_FILE"; "$LOGh" utorized\|a\|unauthdeniedpermission -q "    if grep s
+        ific patternpecr stput for ouheck erro       # C then
+     1 ];de -eq co[ $exit_elif 
+        "out="timeerror_type         ; then
+    137 ]xit_code -eq || [ $eq 124 ]e -exit_cod $e       if ["
+ ransient="t error_typelocal  ype
+      ify error tClass    #   
+  
+        e"de $exit_codith exit conc failed wrive sy"Google D    log 
+    ode=$?local exit_ce
+        
+    els   return 0    " true
+ ogle_drivet "goer_resulircuit_break   handle_c   er
+  uit break in circcess suc # Record    fully"
+   ted success complee syncive Dr log "Googln
+       ve; thegoogle_driwer s -prefer ne -timech -ui textnison -batut 300 uimeo    if tDrive..."
+th Google son sync winning Unig "Ru   loeout
+ creased timwith iny sync 
+   

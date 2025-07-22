@@ -73,4 +73,4 @@
 
 4. **Cleanup**
    - Remove the original scripts once the new structure is fully tested
-   - Archive any remaining redundant files
+   - Archive any remaining redundant file
