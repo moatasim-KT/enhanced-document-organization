@@ -631,20 +631,50 @@ class DocumentOrganizationMCP {
 
   async getSystemMetrics(timeRange = '24h') {
     try {
-      // Simulate performance metrics (replace with actual data collection)
+      // Collect real performance metrics
+      const os = require('os');
+      const { execSync } = require('child_process');
+
+      const cpuInfo = os.cpus();
+      const totalMemory = os.totalmem();
+      const freeMemory = os.freemem();
+
+      const cpuUsage = 'N/A'; // More complex to get real-time CPU usage in Node.js without external libs
+      const memoryUsage = `${((totalMemory - freeMemory) / totalMemory * 100).toFixed(2)}%`;
+
+      let diskUsage = 'N/A';
+      try {
+        const dfOutput = execSync('df -h /', { encoding: 'utf-8' });
+        const lines = dfOutput.trim().split('\n');
+        if (lines.length > 1) {
+          const diskLine = lines[1].split(/\s+/);
+          diskUsage = diskLine[4]; // e.g., 80%
+        }
+      } catch (e) {
+        console.error('Error getting disk usage:', e.message);
+      }
+
       const performanceMetrics = {
-        cpu_usage: '25%',
-        memory_usage: '40%',
-        disk_io: '10 MB/s',
-        network_traffic: '5 MB/s'
+        cpu_usage: cpuUsage,
+        memory_usage: memoryUsage,
+        disk_usage: diskUsage,
+        network_traffic: 'N/A' // Requires more advanced monitoring
       };
 
-      // Simulate usage patterns (replace with actual data collection)
-      const usagePatterns = {
-        documents_organized_last_24h: 150,
-        sync_operations_last_24h: 30,
-        most_active_category: 'Notes & Drafts'
+      // Usage patterns (read from metrics_data.json)
+      let usagePatterns = {
+        documents_organized_last_24h: 0,
+        sync_operations_last_24h: 0,
+        most_active_category: 'N/A'
       };
+      const metricsDataFile = path.join(SCRIPT_DIR, '.gemini', 'metrics_data.json');
+      try {
+        const metricsData = await fs.readFile(metricsDataFile, 'utf-8');
+        const data = JSON.parse(metricsData);
+        usagePatterns = data;
+      } catch (e) {
+        console.error('Error reading metrics_data.json:', e.message);
+      }
 
       // Sync efficiency monitoring (using circuit_breaker_state.json)
       let syncEfficiency = {};

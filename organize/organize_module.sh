@@ -582,6 +582,29 @@ run_organization() {
 
     log "Organization complete."
     log "Summary: $MOVED_FILES files moved, $DEDUPLICATED_FILES duplicates found, $ERROR_FILES errors."
+
+    # Update metrics_data.json
+    local metrics_file="$PARENT_DIR/.gemini/metrics_data.json"
+    if [[ -f "$metrics_file" ]]; then
+        local current_metrics=$(cat "$metrics_file")
+        local current_organized=$(echo "$current_metrics" | jq -r '.documents_organized_last_24h')
+        local new_organized=$((current_organized + MOVED_FILES))
+
+        # Determine most active category (simple approach: just use the last categorized file's category)
+        local most_frequent_category="N/A"
+        if [[ -n "$CATEGORIZED_FILES" && "$CATEGORIZED_FILES" -gt 0 ]]; then
+            # This is a simplification. A real implementation would aggregate counts per category.
+            most_frequent_category=$(grep "^${file}|" "$PROCESSED_FILES_DB" | tail -n 1 | cut -d'|' -f4)
+        fi
+
+        local new_metrics=$(echo "$current_metrics" | jq \
+            --argjson organized "$new_organized" \
+            --arg category "$most_frequent_category" \
+            '.documents_organized_last_24h = $organized | .most_active_category = $category | .last_updated = "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"'
+        )
+        echo "$new_metrics" > "$metrics_file"
+        log "Updated metrics_data.json with organized files count and most active category."
+    fi
 }
 
 create_category() {

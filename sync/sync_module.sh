@@ -1,4 +1,18 @@
-#!/bin/bash
+update_sync_metrics() {
+    local success=$1
+    local metrics_file="$PARENT_DIR/.gemini/metrics_data.json"
+    if [[ -f "$metrics_file" ]]; then
+        local current_metrics=$(cat "$metrics_file")
+        local current_sync_ops=$(echo "$current_metrics" | jq -r '.sync_operations_last_24h')
+        local new_sync_ops=$((current_sync_ops + 1))
+        local new_metrics=$(echo "$current_metrics" | jq \
+            --argjson sync_ops "$new_sync_ops" \
+            '.sync_operations_last_24h = $sync_ops | .last_updated = "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"'
+        )
+        echo "$new_metrics" > "$metrics_file"
+        log "Updated metrics_data.json with sync operations count."
+    fi
+}#!/bin/bash
 
 # ============================================================================
 # CONSOLIDATED SYNC MODULE
@@ -342,9 +356,11 @@ sync_gdrive() {
     if [ $exit_code -eq 0 ]; then
         log "Google Drive sync completed successfully."
         handle_circuit_breaker_result "google_drive" true
+        update_sync_metrics true
     else
         log "Google Drive sync failed with exit code $exit_code."
         handle_circuit_breaker_result "google_drive" false "permanent"
+        update_sync_metrics false
     fi
 }
 
@@ -369,9 +385,11 @@ sync_icloud() {
     if [ $exit_code -eq 0 ]; then
         log "iCloud sync completed successfully."
         handle_circuit_breaker_result "icloud" true
+        update_sync_metrics true
     else
         log "iCloud sync failed with exit code $exit_code."
         handle_circuit_breaker_result "icloud" false "permanent"
+        update_sync_metrics false
     fi
 }
 

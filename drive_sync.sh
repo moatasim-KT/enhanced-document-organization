@@ -56,6 +56,9 @@ main() {
         mcp)
             "$SCRIPT_DIR/mcp/mcp_manager.sh" "$@"
             ;;
+        automation)
+            "$SCRIPT_DIR/automation/automation_manager.sh" "$@"
+            ;;
         all)
             echo "Running complete workflow..."
             "$SCRIPT_DIR/sync/sync_module.sh" sync
