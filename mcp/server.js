@@ -33,7 +33,7 @@ class DocumentOrganizationMCP {
     this.server = new Server(
       {
         name: 'enhanced-document-organization',
-        version: '1.0.0',
+        version: '1.1.0',
       },
       {
         capabilities: {
@@ -65,12 +65,8 @@ class DocumentOrganizationMCP {
                   type: 'string',
                   description: 'Specific category to search in (optional)',
                   enum: [
-                    'AI_ML', 'Physics', 'Neuroscience', 'Mathematics', 'Computer_Science', 'Biology',
-                    'Agents', 'LLMs', 'Computer_Vision', 'NLP', 'Neural_Networks', 'Transformers',
-                    'Reinforcement_Learning', 'MLOps', 'Tools_Frameworks', 'APIs', 'Kubernetes',
-                    'Git', 'Documentation', 'Databases', 'Frontend', 'Backend', 'DevOps',
-                    'Articles', 'Tutorials', 'Guides', 'News', 'Netclips', 'Daily_Notes',
-                    'Literature_Notes', 'Meeting_Notes', 'Ideas', 'Untitled', 'Projects', 'Data'
+                    'AI & ML', 'Research Papers', 'Web Content', 'Notes & Drafts', 'Development',
+                    'Archives/Duplicates', 'Archives/Legacy', 'Archives/Quarantine'
                   ]
                 },
                 limit: {
@@ -512,28 +508,10 @@ class DocumentOrganizationMCP {
       // Sanitize filename
       const filename = title.replace(/[^a-zA-Z0-9\s-_]/g, '').replace(/\s+/g, '_') + '.md';
       
-      // Determine target directory
       let targetDir = PRIMARY_SYNC_DIR;
       if (category) {
-        // Find the appropriate category directory
-        const categoryDirs = [
-          '📚 Research Papers', '🤖 AI & ML', '💻 Development',
-          '🌐 Web Content', '📝 Notes & Drafts', '🔬 Projects',
-          '📊 Data', '🗄️ Archives'
-        ];
-        
-        for (const dir of categoryDirs) {
-          const fullDirPath = path.join(PRIMARY_SYNC_DIR, dir);
-          try {
-            const subdirs = await fs.readdir(fullDirPath);
-            if (subdirs.includes(category)) {
-              targetDir = path.join(fullDirPath, category);
-              break;
-            }
-          } catch (e) {
-            // Directory doesn't exist, continue
-          }
-        }
+        targetDir = path.join(PRIMARY_SYNC_DIR, category);
+        await fs.mkdir(targetDir, { recursive: true });
       }
       
       const filePath = path.join(targetDir, filename);

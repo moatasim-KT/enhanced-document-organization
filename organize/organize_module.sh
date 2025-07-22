@@ -8,7 +8,7 @@
 # @description   A comprehensive document organization system that automatically
 #                categorizes, deduplicates, and manages files across multiple
 #                storage locations.
-# @version       2.0.0
+# @version       2.1.0
 # @author        Document Organization System Team
 # 
 # This module combines functionality from:
@@ -228,10 +228,10 @@ calculate_content_hash() {
         if [[ "$file" == *.md ]]; then
             # For markdown files, normalize whitespace and calculate hash
             # This improves deduplication by ignoring insignificant whitespace differences
-            sed 's/[[:space:]]*$//' "$file" | sed '/^$/d' | $hash_type"sum" | cut -d' ' -f1
+            sed 's/[[:space:]]*$//' "$file" | sed '/^$/d' | ${hash_type}sum | cut -d' ' -f1
         else
             # For other files, use regular hash
-            $hash_type"sum" "$file" | cut -d' ' -f1
+            ${hash_type}sum "$file" | cut -d' ' -f1
         fi
     else
         echo "invalid_file"
@@ -347,7 +347,7 @@ validate_folder_structure() {
                 log "${YELLOW}📂 Creating Inbox folder: $inbox_path${NC}"
                 mkdir -p "$inbox_path"
             fi
-        fi
+        done
         
         # Add custom categories if they exist
         # Custom categories allow users to extend the organization system
@@ -530,6 +530,85 @@ Examples:
 EOF
 }
 
+run_organization() {
+    log "Starting organization process..."
+    initialize_cache
+    validate_folder_structure "$SOURCE_DIR"
+
+    # Find all files in the source directory
+    local files=()
+    while IFS= read -r -d '' file; do
+        files+=("$file")
+    done < <(find "$SOURCE_DIR" -type f -print0)
+
+    TOTAL_FILES=${#files[@]}
+    log "Found $TOTAL_FILES files to process."
+
+    for file in "${files[@]}"; do
+        ((PROCESSED_FILES++))
+        update_progress $PROCESSED_FILES $TOTAL_FILES "Processing files"
+
+        if ! check_file_integrity "$file"; then
+            log "${RED}Error: File integrity check failed for $file${NC}"
+            ((ERROR_FILES++))
+            continue
+        fi
+
+        local hash=$(calculate_content_hash "$file")
+        if grep -q "|$hash|" "$CONTENT_HASH_DB"; then
+            log "${YELLOW}Duplicate file found: $file${NC}"
+            ((DEDUPLICATED_FILES++))
+            # Handle duplicate files (e.g., move to a duplicates folder)
+            continue
+        fi
+
+        # Add to content hash db
+        echo "$hash|$file|$(stat -f %z "$file")|$(date +%s)" >> "$CONTENT_HASH_DB"
+
+        # Categorize and move the file
+        # This is a placeholder for the actual categorization logic
+        local category="Uncategorized"
+        log "Categorizing $file as $category"
+        ((CATEGORIZED_FILES++))
+
+        # Move the file to the category folder
+        local dest_dir="$SOURCE_DIR/$category"
+        mkdir -p "$dest_dir"
+        mv "$file" "$dest_dir/"
+        ((MOVED_FILES++))
+
+        update_processed_db "$file" "$hash" "$category"
+    done
+
+    log "Organization complete."
+    log "Summary: $MOVED_FILES files moved, $DEDUPLICATED_FILES duplicates found, $ERROR_FILES errors."
+}
+
+create_category() {
+    local name="$1"
+    local emoji="$2"
+    local keywords="$3"
+    local creation_date=$(date '+%Y-%m-%d')
+
+    echo "$name|$emoji|$keywords|$creation_date" >> "$CUSTOM_CATEGORIES_FILE"
+    log "${GREEN}Successfully created category: $emoji $name${NC}"
+}
+
+show_status() {
+    log "System Status:"
+    log "  - Total files processed: $PROCESSED_FILES"
+    log "  - Files moved: $MOVED_FILES"
+    log "  - Duplicates found: $DEDUPLICATED_FILES"
+    log "  - Errors: $ERROR_FILES"
+}
+
+process_inbox() {
+    for inbox in "${INBOX_LOCATIONS[@]}"; do
+        log "Processing inbox: $inbox"
+        # Add logic to process files in inbox locations
+    done
+}
+
 /**
  * Main function that processes command-line arguments and executes commands
  * Entry point for the module's functionality
@@ -551,28 +630,24 @@ main() {
     
     case "$command" in
         run)
-            log "Running organization..."
-            # Call the organization function here
+            run_organization
             ;;
         dry-run)
             log "Running organization in dry-run mode..."
-            # Call the organization function with dry-run flag
+            # Add dry-run logic here
             ;;
         status)
-            log "Checking system status..."
-            # Call the status function
+            show_status
             ;;
         create-category)
             if [[ "$#" -lt 3 ]]; then
                 log "${RED}❌ Missing parameters. Usage: create-category NAME EMOJI KEYWORDS${NC}"
                 exit 1
             fi
-            log "Creating new category: $1 $2"
-            # Call the create category function
+            create_category "$1" "$2" "$3"
             ;;
         process-inbox)
-            log "Processing inbox folders..."
-            # Call the process inbox function
+            process_inbox
             ;;
         *)
             echo "Unknown command: $command"
