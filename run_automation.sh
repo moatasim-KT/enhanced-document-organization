@@ -103,29 +103,18 @@ run_unison "google_drive"
 # Step 2: Organize documents
 log "Step 2: Organizing documents..."
 
-# Modify the organize_documents_enhanced.sh script to use SYNC_HUB as SOURCE_DIR
-if [[ -f "$SCRIPT_DIR/organize_documents_enhanced.sh" ]]; then
-    log "Running organization script directly with SYNC_HUB as source..."
+# Run the organize module with SYNC_HUB as source
+if [[ -f "$SCRIPT_DIR/organize/organize_module.sh" ]]; then
+    log "Running organization module with SYNC_HUB as source..."
     
-    # Create a temporary modified version of the script
-    TEMP_SCRIPT="$SCRIPT_DIR/.temp_organize_script.sh"
-    cp "$SCRIPT_DIR/organize_documents_enhanced.sh" "$TEMP_SCRIPT"
-    
-    # Replace the SOURCE_DIR line with our SYNC_HUB
-    sed -i '' "s|SOURCE_DIR=\"[^\"]*\"|SOURCE_DIR=\"$SYNC_HUB\"|" "$TEMP_SCRIPT"
-    
-    # Run the modified script
-    chmod +x "$TEMP_SCRIPT"
-    if "$TEMP_SCRIPT"; then
+    # Run the organize module with source directory parameter
+    if "$SCRIPT_DIR/organize/organize_module.sh" run --source "$SYNC_HUB"; then
         log "✅ Document organization completed successfully"
     else
         log_error "❌ Document organization failed with exit code $?"
     fi
-    
-    # Clean up
-    rm -f "$TEMP_SCRIPT"
 else
-    log_error "Organization script not found: $SCRIPT_DIR/organize_documents_enhanced.sh"
+    log_error "Organization module not found: $SCRIPT_DIR/organize/organize_module.sh"
 fi
 
 # Step 3: Second sync - push organized changes back to cloud services

@@ -393,7 +393,7 @@ class DocumentOrganizationMCP {
       const options = force ? '--force' : '';
       
       const result = execSync(
-        `cd ${SCRIPT_DIR} && ./organize_manager.sh ${command} ${options}`,
+        `cd ${SCRIPT_DIR} && ./organize/organize_module.sh ${command} ${options}`,
         { encoding: 'utf-8', timeout: 300000 } // 5 minute timeout
       );
       
@@ -420,7 +420,7 @@ class DocumentOrganizationMCP {
       const command = force ? 'sync --force' : 'sync';
       
       const result = execSync(
-        `cd ${SCRIPT_DIR} && ./sync_manager.sh ${command}`,
+        `cd ${SCRIPT_DIR} && ./sync/sync_module.sh ${command}`,
         { encoding: 'utf-8', timeout: 600000 } // 10 minute timeout
       );
       
@@ -445,7 +445,7 @@ class DocumentOrganizationMCP {
   async getOrganizationStats() {
     try {
       const result = execSync(
-        `cd ${SCRIPT_DIR} && ./organize_manager.sh status`,
+        `cd ${SCRIPT_DIR} && ./organize/organize_module.sh status`,
         { encoding: 'utf-8' }
       );
       
@@ -552,7 +552,7 @@ class DocumentOrganizationMCP {
       if (autoOrganize) {
         try {
           const organizeResult = execSync(
-            `cd ${SCRIPT_DIR} && ./organize_manager.sh run`,
+            `cd ${SCRIPT_DIR} && ./organize/organize_module.sh run`,
             { encoding: 'utf-8', timeout: 300000 }
           );
           result.organization_result = organizeResult;

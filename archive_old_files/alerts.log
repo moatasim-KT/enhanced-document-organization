@@ -1,4 +1,0 @@
-[2025-06-09 19:01:00] [INFO] Test alert - system is functioning normally
-[2025-06-21 19:00:40] [WARNING] icloud sync took 884s (threshold: 600s)
-[2025-06-22 02:38:28] [WARNING] Disk space usage is 86% (threshold: 85%)
-[2025-06-22 15:56:42] [WARNING] Disk space usage is 90% (threshold: 85%)
