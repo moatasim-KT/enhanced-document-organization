@@ -8,23 +8,20 @@
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync/run_automation.sh</string>
+        <string>/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync/drive_sync.sh</string>
+        <string>all</string>
     </array>
     
-    <!-- Run every 30 minutes (1800 seconds) for optimal balance -->
+    <!-- Run every hour (3600 seconds) -->
     <key>StartInterval</key>
-    <integer>1800</integer>
+    <integer>3600</integer>
     
     <!-- Run at system startup/login -->
     <key>RunAtLoad</key>
     <true/>
     
-    <!-- Keep the job alive if it exits -->
+    <!-- Don't keep the job alive if it exits -->
     <key>KeepAlive</key>
-    <false/>
-    
-    <!-- Don't run if the system is on battery and battery is low -->
-    <key>OnDemand</key>
     <false/>
     
     <!-- Environment variables -->
@@ -42,11 +39,16 @@
     
     <!-- Logging -->
     <key>StandardOutPath</key>
-    <string>/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync/launchd_out.log</string>
+    <string>/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync/logs/automation.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync/launchd_err.log</string>
+    <string>/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync/logs/automation_error.log</string>
     
     <!-- Only run when user is logged in -->
+    <key>LimitLoadToSessionType</key>
+    <string>Aqua</string>
+    
+</dict>
+</plist>
     <key>LimitLoadToSessionType</key>
     <string>Aqua</string>
     

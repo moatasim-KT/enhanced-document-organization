@@ -9,7 +9,6 @@
     },
     "scripts": {
         "start": "node server.js",
-        "dev": "node --inspect server.js",
         "test": "echo \"Testing MCP server...\" && node server.js --test"
     },
     "keywords": [
@@ -38,6 +37,12 @@
             "version": "1.0.0",
             "description": "Provides AI assistants access to organized documents through Model Context Protocol",
             "capabilities": [
+                "create_conversation_session",
+                "store_conversation",
+                "get_conversation_history",
+                "get_conversation_summary",
+                "store_user_preference",
+                "get_user_preference",
                 "search_documents",
                 "get_document_content",
                 "organize_documents",

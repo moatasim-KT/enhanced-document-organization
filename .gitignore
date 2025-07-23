@@ -12,10 +12,7 @@ launchd_*.log
 *_cron.log
 test_*.log
 alerts.log
-
-# MCP Server
-mcp-server/server.log
-mcp-server/.server.pid
+.git*
 
 # Backup directories
 *_backup_*

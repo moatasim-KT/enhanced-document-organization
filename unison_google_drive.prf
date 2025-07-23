@@ -1,11 +1,16 @@
-root = /Users/moatasimfarooque/Downloads/Data_Science/Sync/
-root = /Users/moatasimfarooque/gdrive_sync
+# Unison profile for Google Drive sync
+# Syncs between local sync hub and Google Drive
 
-# Unison options
+# Sync directories
+root = /Users/moatasimfarooque/Sync_Hub_New
+root = /Users/moatasimfarooque/Library/CloudStorage/GoogleDrive-moatasim23android@gmail.com/My Drive/Sync
+
+# Basic sync options
 auto = true
 batch = true
 prefer = newer
 log = true
+silent = false
 
 # Conflict resolution
 backup = Name *
@@ -13,7 +18,7 @@ backupcurr = Name *
 backupnot = Name *.tmp
 maxbackups = 5
 
-# Ignore patterns to avoid deadlocks
+# Standard ignore patterns
 ignore = Name .DS_Store
 ignore = Name .localized
 ignore = Name .Spotlight-V100
@@ -26,14 +31,14 @@ ignore = Name *~
 ignore = Name .#*
 ignore = Name #*#
 
-# Ignore Google Drive sync files
+# Google Drive specific ignores
 ignore = Name *.gdoc
 ignore = Name *.gsheet
 ignore = Name *.gslides
 ignore = Name .tmp.driveupload
 ignore = Name .tmp.drivedownload
 
-# Enhanced ignore patterns for problematic files
+# Common problematic file patterns
 ignore = Regex .*:.*
 ignore = Regex .*".*
 ignore = Regex .*<.*
@@ -43,10 +48,30 @@ ignore = Name *.lock
 ignore = Name *.lnk
 ignore = Name desktop.ini
 ignore = Name Thumbs.db
-ignore = Name .dropbox*
-ignore = Name .sync*
 ignore = Name *conflicted copy*
 ignore = Name *conflict*
+
+# Ignore emoji-named directories that can cause sync issues
+ignore = Name 🎯*
+ignore = Name 💻*
+ignore = Name 📊*
+ignore = Name 📚*
+ignore = Name 📝*
+ignore = Regex .*[🎯💻📊📚📝].*
+
+# Version control and sync service files
+ignore = Name .git
+ignore = Name .gitignore
+ignore = Name .sync*
+ignore = Name .dropbox*
+
+# Obsidian files that might cause conflicts
+ignore = Name .obsidian*
+
+# Performance settings
+retry = 3
+confirmbigdel = false
+fastcheck = true
 
 # Performance and reliability settings
 retry = 3

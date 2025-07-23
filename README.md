@@ -1,208 +1,348 @@
 # Enhanced Document Organization System
 
-A comprehensive, intelligent document organization system with advanced reliability features for content analysis, synchronization across cloud services, and AI-powered assistance.
-
-## Table of Contents
-
-- [Overview](#overview)
-- [System Architecture](#system-architecture)
-- [Project Structure](#project-structure)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Document Categories](#document-categories)
-- [Sync Locations](#sync-locations)
-- [Reliability Features](#reliability-features)
-- [AI Integration (MCP Server)](#ai-integration-mcp-server)
-- [Configuration](#configuration)
-- [System Requirements](#system-requirements)
-- [Troubleshooting](#troubleshooting)
-- [Maintenance Guide](#maintenance-guide)
-- [Development and Contribution](#development-and-contribution)
+A clean, streamlined document management system that automatically synchronizes files across cloud services and organizes them into intelligent categories using AI-powered content analysis.
 
 ## Overview
 
-This system provides automated organization and synchronization of documents across multiple cloud platforms (iCloud, Google Drive) with intelligent categorization, reliability enhancements, and AI integration through a Model Context Protocol (MCP) server.
+This system provides a complete document workflow:
+- **🔄 Automatic Sync** - Bidirectional sync between iCloud, Google Drive, and local hub
+- **🧠 Smart Organization** - AI-powered categorization into 5 intuitive categories
+- **🤖 AI Integration** - MCP server for AI assistant integration (Claude, etc.)
+- **⚡ Automation** - Scheduled background processing via LaunchAgent
+- **🛡️ Reliability** - Error handling, logging, and recovery mechanisms
 
-### Key Features
-
-- **Smart Content Analysis**: Automatically categorizes files based on content
-- **Multi-Platform Sync**: Seamless synchronization across iCloud and Google Drive
-- **Enhanced Reliability**: Circuit breaker pattern, adaptive retry, and automated recovery
-- **AI Integration**: MCP server for AI assistants to manage documents intelligently
-- **Simplified Categories**: Option for 5 main categories or detailed 47+ category system
-
-## System Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Document Organization                      │
-│                                                                 │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │Content Analysis │  │  Categorization │  │  Deduplication  │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
-│                                                                 │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      Sync Reliability Layer                     │
-│                                                                 │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │Error Classification│  │Adaptive Retry   │  │Circuit Breaker  │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
-│                                                                 │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │Recovery Engine  │  │Health Monitoring│  │Self-Healing     │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
-│                                                                 │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      Cloud Synchronization                      │
-│                                                                 │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │   iCloud Sync   │  │ Google Drive Sync│  │  Local Storage  │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
-│                                                                 │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                        AI Integration                           │
-│                                                                 │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │   MCP Server    │  │Document Search  │  │Content Creation  │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-## Project Structure
-
-```
-Drive_sync/
-├── drive_sync.sh              # Main entry point script
-├── config.env                 # Environment configuration
-├── organize_config.conf       # Organization settings
-├── README.md                  # This file
-│
-├── organize/                  # Organization module
-│   └── organize_module.sh     # Consolidated organization script
-│
-├── sync/                      # Sync module
-│   └── sync_module.sh         # Consolidated sync script
-│
-├── mcp/                       # MCP module
-│   ├── mcp_manager.sh         # MCP server management
-│   ├── server.js              # MCP server implementation
-│   └── package.json           # MCP server dependencies
-│
-├── tests/                     # Test scripts
-│   ├── test_category_patterns_simple.sh
-│   ├── test_recovery_action_registry.sh
-│   ├── test_recovery_engine.sh
-│   └── test_simplified_categorization.sh
-│
-└── .cache/                    # Processing cache
-    ├── processed_files.db     # Database of processed files
-    └── content_hashes.db      # Database of content hashes
-```
-
-## Installation
-
-1.  **Clone the repository**:
-    ```bash
-    git clone <repository-url>
-    cd Drive_sync
-    ```
-
-2.  **Install dependencies**:
-    ```bash
-    # Install Unison for sync
-    brew install unison
-    
-    # Install Node.js for MCP server
-    brew install node
-    
-    # Install MCP server dependencies
-    cd mcp
-    npm install
-    cd ..
-    ```
-
-3.  **Configure paths**:
-    Edit `config.env` to set your specific paths for iCloud, Google Drive, and local directories.
-
-4.  **Set up sync profiles**:
-    ```bash
-    # Copy Unison profiles to ~/.unison/
-    cp unison_icloud.prf ~/.unison/icloud.prf
-    cp unison_google_drive.prf ~/.unison/google_drive.prf
-    ```
-
-5.  **Set up automation** (optional):
-    ```bash
-    # Copy LaunchAgent plist to ~/Library/LaunchAgents/
-    cp com.moatasim.enhanced-document-organization.plist ~/Library/LaunchAgents/
-    
-    # Load the LaunchAgent
-    launchctl load ~/Library/LaunchAgents/com.moatasim.enhanced-document-organization.plist
-    ```
-
-## Usage
-
-### Main Command
+## Quick Start
 
 ```bash
-# Show help
-./drive_sync.sh help
+# 1. Setup the system
+./setup.sh
 
-# Run complete workflow (sync → organize → sync)
+# 2. Configure your paths (edit config.env)
+nano config.env
+
+# 3. Test the system
+./drive_sync.sh status
+
+# 4. Run complete workflow
 ./drive_sync.sh all
 ```
 
-### Document Organization
+## Architecture
 
-The document organization module is responsible for intelligently categorizing and moving files based on their content and predefined rules. It supports both a simplified 5-category system and a detailed 47+ category structure.
+```
+Enhanced Document Organization System
+├── drive_sync.sh              # Main entry point & workflow manager
+├── config.env                 # Central configuration file
+├── setup.sh                   # One-command installation
+│
+├── sync/                      # Cloud synchronization
+│   └── sync_module.sh         # Unison-based bidirectional sync
+│
+├── organize/                  # Document organization  
+│   └── organize_module.sh     # AI-powered categorization
+│
+├── mcp/                       # AI integration
+│   ├── server.js              # MCP server (8 tools)
+│   ├── package.json           # Node.js dependencies
+│   └── node_modules/          # Dependencies
+│
+├── unison_icloud.prf          # iCloud sync configuration
+├── unison_google_drive.prf    # Google Drive sync configuration
+├── organize_config.conf       # Organization rules & patterns
+└── com.moatasim....plist      # LaunchAgent for automation
+```
+## Installation
 
-**Key Features:**
-- **Smart Content Analysis**: Automatically analyzes file content to determine the most appropriate category.
-- **Flexible Categorization**: Supports both simplified and detailed categorization systems.
-- **Custom Categories**: Allows users to define and manage their own custom categories.
-- **Dry Run Mode**: Enables testing of organization rules without making actual changes to the file system.
-- **Status Monitoring**: Provides insights into the organization process and categorized files.
-
+### Automatic Setup
 ```bash
-# Run document organization
-./drive_sync.sh organize run
-
-# Test organization without making changes
-./drive_sync.sh organize dry-run
-
-# Check organization status
-./drive_sync.sh organize status
-
-# Create a new custom category
-./drive_sync.sh organize create-category "Data Science" "📊" "data science,machine learning,statistics"
+git clone <repository-url>
+cd Drive_sync
+./setup.sh
 ```
 
-### Sync Management
-
-The synchronization management module provides tools to control and monitor the file synchronization process across all configured cloud and local storage locations. It allows users to initiate syncs, check the health of sync operations, and manage the circuit breaker state.
-
-**Key Features:**
-- **Manual Sync Trigger**: Initiate synchronization on demand.
-- **Health Checks**: Monitor the status and identify potential issues with sync operations.
-- **Circuit Breaker Management**: Reset the circuit breaker to re-enable sync operations after a period of failure.
-- **Status Reporting**: View the current status of synchronization processes.
-
+### Manual Setup
 ```bash
-# Run sync process
-./drive_sync.sh sync sync
+# Install dependencies
+brew install unison node
 
-# Check sync health
-./drive_sync.sh sync health
+# Install Node.js packages
+cd mcp && npm install
+
+# Configure paths in config.env
+cp config.env.example config.env
+nano config.env
+
+# Test installation
+./drive_sync.sh status
+```
+
+## Configuration
+
+### Main Configuration (`config.env`)
+```bash
+# Core Paths
+SYNC_HUB="/Users/username/Sync_Hub_New"
+ICLOUD_PATH="/Users/username/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync"
+GOOGLE_DRIVE_PATH="/Users/username/Library/CloudStorage/GoogleDrive-email@gmail.com/My Drive/Sync"
+
+# Features
+SYNC_ENABLED=true
+ORGANIZATION_ENABLED=true
+MCP_ENABLED=true
+
+# Logging
+LOG_LEVEL="INFO"
+LOG_RETENTION_DAYS=30
+```
+
+### Organization Rules (`organize_config.conf`)
+Defines patterns for automatic categorization:
+- Keyword matching
+- File extension mapping
+- Content analysis rules
+- Category priorities
+
+## Usage
+
+### Command Line Interface
+```bash
+# Complete workflow (recommended)
+./drive_sync.sh all                    # sync → organize → sync
+
+# Individual operations
+./drive_sync.sh sync                   # Sync all cloud services
+./drive_sync.sh organize               # Organize documents
+./drive_sync.sh status                 # System health check
+
+# Options
+./drive_sync.sh organize dry-run       # Preview changes
+./drive_sync.sh sync icloud           # Sync specific service
+./drive_sync.sh all dry-run           # Preview complete workflow
+
+# MCP Server
+./drive_sync.sh mcp start             # Start AI integration server
+./drive_sync.sh mcp status            # Check server status
+```
+
+### Automation Setup
+```bash
+# Enable hourly automation
+cp com.moatasim.enhanced-document-organization.plist ~/Library/LaunchAgents/
+launchctl load ~/Library/LaunchAgents/com.moatasim.enhanced-document-organization.plist
+
+# Check automation status
+launchctl list | grep com.moatasim.enhanced-document-organization
+```
+
+## Document Categories
+
+The system automatically organizes files into 5 categories:
+
+### 🤖 AI & ML
+- Machine learning papers and tutorials
+- Data science notebooks and datasets
+- AI research documents
+- Technical frameworks and tools
+
+### 📚 Research Papers  
+- Academic papers (PDF, arXiv)
+- Scientific studies and journals
+- Research notes and annotations
+- Literature reviews
+
+### 🌐 Web Content
+- Blog posts and articles
+- Tutorials and guides
+- Bookmarks and web clippings
+- Online resources
+
+### 📝 Notes & Drafts
+- Meeting notes and minutes
+- Personal thoughts and ideas
+- Draft documents
+- Quick captures
+
+### 💻 Development
+- API documentation
+- Code snippets and examples
+- Technical specifications
+- Programming tutorials
+
+## AI Integration (MCP Server)
+
+The system includes an MCP (Model Context Protocol) server with 8 powerful tools:
+
+### Available Tools
+1. **search_documents** - Search by content, category, or filename
+2. **get_document_content** - Retrieve full document content
+3. **create_document** - Create new documents with auto-categorization
+4. **organize_documents** - Run organization system
+5. **sync_documents** - Trigger cloud synchronization
+6. **get_organization_stats** - System statistics and metrics
+7. **list_categories** - Show all categories with file counts
+8. **get_system_status** - Health check and system information
+
+### Setup for Claude Desktop
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "enhanced-document-organization": {
+      "command": "node",
+      "args": ["/absolute/path/to/Drive_sync/mcp/server.js"],
+      "env": {}
+    }
+  }
+}
+```
+
+### Example AI Interactions
+```
+# Search for machine learning papers
+"Find all documents about neural networks in my AI & ML category"
+
+# Get system overview
+"Show me my document organization statistics"
+
+# Create and organize new content
+"Create a new research note about transformer architectures"
+```
+
+## Cloud Storage Configuration
+
+### Supported Services
+- **iCloud Drive** - Full bidirectional sync
+- **Google Drive** - Full bidirectional sync  
+- **Local Hub** - Central management location
+
+### Default Locations
+```
+Local Hub:     ~/Sync_Hub_New/
+iCloud:        ~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync/
+Google Drive:  ~/Library/CloudStorage/GoogleDrive-*/My Drive/Sync/
+```
+
+### Directory Structure
+```
+Sync_Hub_New/
+├── Inbox/                    # New files (unorganized)
+├── 🤖 AI & ML/              # AI and machine learning content
+├── 📚 Research Papers/       # Academic and research documents  
+├── 🌐 Web Content/          # Articles and web resources
+├── 📝 Notes & Drafts/       # Personal notes and drafts
+└── 💻 Development/          # Technical documentation
+```
+
+## System Requirements
+
+### Operating System
+- **macOS** 12.0+ (Monterey or later)
+- Tested on macOS 14+ (Sonoma/Sequoia)
+
+### Dependencies
+- **Unison** 2.52+ - File synchronization
+  ```bash
+  brew install unison
+  ```
+- **Node.js** 18+ - MCP server runtime
+  ```bash
+  brew install node
+  ```
+
+### Storage Requirements
+- **Minimum**: 1GB free disk space
+- **Recommended**: 5GB+ for active document management
+
+### Network
+- Stable internet connection for cloud sync
+- Cloud storage accounts (iCloud, Google Drive)
+
+## Troubleshooting
+
+### Common Issues
+
+**Sync Failures**
+```bash
+# Check cloud service status
+./drive_sync.sh status
+
+# Test individual services
+./drive_sync.sh sync icloud
+./drive_sync.sh sync gdrive
+
+# Check Unison configuration
+unison -version
+```
+
+**Organization Not Working**
+```bash
+# Test with dry-run
+./drive_sync.sh organize dry-run
+
+# Check configuration
+cat organize_config.conf
+```
+
+**MCP Server Issues**
+```bash
+# Test server directly
+echo '{"jsonrpc": "2.0", "method": "tools/list", "id": 1}' | node mcp/server.js
+
+# Check dependencies
+cd mcp && npm list
+```
+
+**LaunchAgent Problems**
+```bash
+# Check agent status
+launchctl list | grep com.moatasim
+
+# Reload agent
+launchctl unload ~/Library/LaunchAgents/com.moatasim.enhanced-document-organization.plist
+launchctl load ~/Library/LaunchAgents/com.moatasim.enhanced-document-organization.plist
+```
+
+### Getting Help
+1. Run `./drive_sync.sh status` for system health
+2. Check the project's GitHub issues
+3. Review configuration files for typos
+4. Ensure all dependencies are properly installed
+
+## Security & Privacy
+
+- **Local Processing** - All organization happens locally
+- **No Data Collection** - No telemetry or external data transmission
+- **Secure Sync** - Uses official cloud service APIs
+- **Permissions** - Minimal system access required
+
+## Performance
+
+- **Fast Sync** - Incremental changes only
+- **Smart Organization** - Processes only new/modified files  
+- **Low Resource Usage** - Minimal CPU/memory footprint
+- **Background Operation** - Non-intrusive automation
+
+## Contributing
+
+This project follows a clean, minimal architecture. When contributing:
+
+1. Maintain the simplified structure
+2. Add comprehensive logging
+3. Include error handling
+4. Test with multiple file types
+5. Update documentation
+
+## License
+
+MIT License - see LICENSE file for details.
+
+## Version
+
+Current Version: 2.0.0 (Cleaned & Streamlined)
+- Simplified from 100+ files to ~15 essential files
+- Removed complex/redundant components
+- Enhanced reliability and maintainability
+- Improved AI integration with MCP server
 
 # Reset circuit breakers
 ./drive_sync.sh sync reset-circuit

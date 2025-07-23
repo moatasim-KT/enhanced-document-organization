@@ -1,495 +1,124 @@
 #!/bin/bash
 
 # ============================================================================
-# CONSOLIDATED ORGANIZATION MODULE
+# SIMPLIFIED ORGANIZE MODULE
 # ============================================================================
-# 
-# @file          organize_module.sh
-# @description   A comprehensive document organization system that automatically
-#                categorizes, deduplicates, and manages files across multiple
-#                storage locations.
-# @version       2.1.0
-# @author        Document Organization System Team
-# 
-# This module combines functionality from:
-# - organize_documents_enhanced.sh
-# - organize_manager.sh
-# - simplified_categorization.sh
-#
-# USAGE:
-#   ./organize_module.sh run                     # Run organization process
-#   ./organize_module.sh dry-run                 # Test without making changes
-#   ./organize_module.sh status                  # Check system status
-#   ./organize_module.sh create-category NAME EMOJI KEYWORDS  # Create custom category
-#   ./organize_module.sh process-inbox           # Process inbox folders only
-#
-# CONFIGURATION:
-#   All settings are loaded from config.env in the parent directory.
-#   Key settings include:
-#   - SOURCE_DIR: Main directory to organize
-#   - INBOX_LOCATIONS: Array of inbox folders to monitor
-#   - ENABLE_CONTENT_ANALYSIS: Enable/disable content-based categorization
-#   - ENABLE_SIMPLIFIED_CATEGORIZATION: Use simplified 5-category structure
-#
-# ============================================================================
+# Clean and simple document organization using the 5-category system
 
 set -euo pipefail
 
-# Directory and path configuration
+# Get script directory and parent
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PARENT_DIR="$(dirname "$SCRIPT_DIR")"
-LOG_FILE="$PARENT_DIR/organize_module.log"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-# Load configuration from environment file
-source "$PARENT_DIR/config.env"
+# Load configuration
+source "$PROJECT_DIR/config.env"
 
-# Cache directory and databases
-CACHE_DIR="$PARENT_DIR/.cache"
-PROCESSED_FILES_DB="$CACHE_DIR/processed_files.db"
-CONTENT_HASH_DB="$CACHE_DIR/content_hashes.db"
-CUSTOM_CATEGORIES_FILE="$PARENT_DIR/custom_categories.txt"
-
-# ============================================================================
-# CONFIGURATION SETTINGS
-# ============================================================================
-
-# Content analysis settings
-# Controls whether files are analyzed for content-based categorization
-ENABLE_CONTENT_ANALYSIS=true
-
-# Integrity checking
-# Validates files for corruption, encoding issues, and minimum size requirements
-ENABLE_INTEGRITY_CHECK=true
-
-# Smart categorization
-# Uses content analysis and pattern matching to determine file categories
-ENABLE_SMART_CATEGORIZATION=true
-
-# Cross-sync validation
-# Checks for consistency across sync locations before organizing
-ENABLE_CROSS_SYNC_VALIDATION=false
-
-# Incremental processing
-# Only processes files that have changed since last run
-ENABLE_INCREMENTAL_PROCESSING=true
-
-# Metadata preservation
-# Preserves file metadata (creation date, tags) during organization
-ENABLE_METADATA_PRESERVATION=true
-
-# Advanced deduplication
-# Uses content hashing to identify duplicate files even with different names
-ENABLE_ADVANCED_DEDUPLICATION=true
-
-# Progress tracking
-# Shows visual progress indicators during processing
-ENABLE_PROGRESS_TRACKING=true
-
-# Simplified categorization
-# Uses a simplified 5-category structure instead of detailed hierarchy
-ENABLE_SIMPLIFIED_CATEGORIZATION=true
-
-# ============================================================================
-# THRESHOLD SETTINGS
-# ============================================================================
-
-# Minimum file size in bytes to be considered valid
-# Files smaller than this will be flagged for review
-MIN_FILE_SIZE=10
-
-# Maximum filename length allowed
-# Longer filenames will be truncated during organization
-MAX_FILENAME_LENGTH=80
-
-# Time threshold in seconds for incremental processing
-# Files modified within this threshold will be reprocessed
-INCREMENTAL_THRESHOLD=3600  # 1 hour
-
-# Number of lines to analyze for content-based categorization
-# Higher values are more accurate but slower
-CONTENT_ANALYSIS_DEPTH=50
-
-# ============================================================================
-# PROGRESS TRACKING VARIABLES
-# ============================================================================
-
-TOTAL_FILES=0
-PROCESSED_FILES=0
-MOVED_FILES=0
-DEDUPLICATED_FILES=0
-ERROR_FILES=0
-CATEGORIZED_FILES=0
-
-# ============================================================================
-# OUTPUT FORMATTING
-# ============================================================================
-
-# ANSI color codes for terminal output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
-
-# ============================================================================
-# UTILITY FUNCTIONS
-# ============================================================================
-
-/**
- * Logs a message to both console and log file
- *
- * @param {string} message - The message to log
- * @return {void}
- *
- * @example
- * log "Processing file: document.md"
- * log "${RED}Error: File not found${NC}"
- */
+# Logging function
 log() {
-    echo -e "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
-}
-
-/**
- * Initializes cache directory and databases
- * Creates necessary directories and database files if they don't exist
- *
- * @return {void}
- *
- * @example
- * initialize_cache
- */
-initialize_cache() {
-    mkdir -p "$CACHE_DIR"
+    local level="$1"
+    shift
+    local message="$*"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     
-    # Create processed files database if it doesn't exist
-    if [[ ! -f "$PROCESSED_FILES_DB" ]]; then
-        echo "# Processed Files Database" > "$PROCESSED_FILES_DB"
-        echo "# Format: filepath|hash|timestamp|category" >> "$PROCESSED_FILES_DB"
+    if [[ "$LOG_TO_CONSOLE" == "true" ]]; then
+        echo "[$timestamp] [$level] $message"
     fi
     
-    # Create content hash database if it doesn't exist
-    if [[ ! -f "$CONTENT_HASH_DB" ]]; then
-        echo "# Content Hash Database" > "$CONTENT_HASH_DB"
-        echo "# Format: hash|filepath|size|timestamp" >> "$CONTENT_HASH_DB"
+    if [[ "$LOG_TO_FILE" == "true" ]]; then
+        mkdir -p "$PROJECT_DIR/logs"
+        echo "[$timestamp] [$level] $message" >> "$PROJECT_DIR/logs/organize.log"
     fi
 }
 
-/**
- * Updates and displays progress information
- * Shows a visual progress bar if ENABLE_PROGRESS_TRACKING is true
- *
- * @param {number} current - Current progress count
- * @param {number} total - Total items to process
- * @param {string} operation - Description of the current operation
- * @return {void}
- *
- * @example
- * update_progress 45 100 "Categorizing files"
- */
-update_progress() {
-    local current=$1
-    local total=$2
-    local operation=$3
-    
-    if [[ "$ENABLE_PROGRESS_TRACKING" == "true" ]]; then
-        local percent=$((current * 100 / total))
-        local progress_bar=""
-        local filled=$((percent / 2))
-        
-        # Generate the progress bar visualization
-        for ((i=0; i<filled; i++)); do progress_bar+="█"; done
-        for ((i=filled; i<50; i++)); do progress_bar+="░"; done
-        
-        # Print the progress bar with percentage and counts
-        printf "\r${CYAN}%s${NC} [%s] %d%% (%d/%d)" "$operation" "$progress_bar" "$percent" "$current" "$total"
+# Ensure directory exists
+ensure_directory() {
+    local dir="$1"
+    if [[ ! -d "$dir" ]]; then
+        log "INFO" "Creating directory: $dir"
+        mkdir -p "$dir"
     fi
 }
 
-/**
- * Calculates a content hash for a file with special handling for different file types
- * For markdown files, normalizes whitespace before hashing to improve deduplication
- *
- * @param {string} file - Path to the file to hash
- * @param {string} [hash_type=sha256] - Hash algorithm to use (sha256, md5, etc.)
- * @return {string} - The calculated hash or "invalid_file" if file doesn't exist
- *
- * @example
- * hash=$(calculate_content_hash "document.md")
- * hash=$(calculate_content_hash "image.jpg" "md5")
- */
-calculate_content_hash() {
+# Get category for file based on content and filename
+get_file_category() {
     local file="$1"
-    local hash_type="${2:-sha256}"
+    local filename=$(basename "$file")
+    local content=""
     
-    if [[ -f "$file" ]]; then
-        # Use different hashing based on file type
-        if [[ "$file" == *.md ]]; then
-            # For markdown files, normalize whitespace and calculate hash
-            # This improves deduplication by ignoring insignificant whitespace differences
-            sed 's/[[:space:]]*$//' "$file" | sed '/^$/d' | ${hash_type}sum | cut -d' ' -f1
+    # Read file content for analysis (first few lines)
+    if [[ -f "$file" && -r "$file" ]]; then
+        content=$(head -n "$CONTENT_ANALYSIS_DEPTH" "$file" 2>/dev/null || echo "")
+    fi
+    
+    # Combine filename and content for analysis
+    local text="$filename $content"
+    local text_lower=$(echo "$text" | tr '[:upper:]' '[:lower:]')
+    
+    # AI & ML category
+    if echo "$text_lower" | grep -qE "(machine learning|neural network|deep learning|artificial intelligence|pytorch|tensorflow|scikit|pandas|numpy|jupyter|notebook|algorithm|model|training|dataset|ai|ml|llm|gpt|transformer|bert)" 2>/dev/null; then
+        echo "$CATEGORY_AI_ML"
+        return
+    fi
+    
+    # Research Papers category
+    if echo "$text_lower" | grep -qE "(abstract|introduction|methodology|literature review|bibliography|citation|doi:|arxiv|paper|journal|research|study|analysis|findings|conclusion)" 2>/dev/null; then
+        echo "$CATEGORY_RESEARCH"
+        return
+    fi
+    
+    # Development category
+    if echo "$text_lower" | grep -qE "(function|class|import|export|api|github|git|code|programming|software|development|javascript|python|bash|shell|dockerfile|kubernetes|docker)" 2>/dev/null; then
+        echo "$CATEGORY_DEV"
+        return
+    fi
+    
+    # Web Content category
+    if echo "$text_lower" | grep -qE "(article|tutorial|guide|blog|news|web|http|https|www\.|link|url|bookmark)" 2>/dev/null; then
+        echo "$CATEGORY_WEB"
+        return
+    fi
+    
+    # Default to Notes & Drafts
+    echo "$CATEGORY_NOTES"
+}
+
+# Move file to category directory
+move_to_category() {
+    local file="$1"
+    local category="$2"
+    local source_dir="$3"
+    
+    # Create category directory
+    local category_dir="$source_dir/$category"
+    ensure_directory "$category_dir"
+    
+    # Get filename
+    local filename=$(basename "$file")
+    local target_file="$category_dir/$filename"
+    
+    # Handle name conflicts
+    local counter=1
+    while [[ -f "$target_file" ]]; do
+        local name="${filename%.*}"
+        local ext="${filename##*.}"
+        if [[ "$name" == "$ext" ]]; then
+            # No extension
+            target_file="$category_dir/${filename}_${counter}"
         else
-            # For other files, use regular hash
-            ${hash_type}sum "$file" | cut -d' ' -f1
+            target_file="$category_dir/${name}_${counter}.${ext}"
         fi
-    else
-        echo "invalid_file"
-    fi
-}
-
-/**
- * Checks if a file was recently processed based on the incremental threshold
- * Used to skip unchanged files for faster processing
- *
- * @param {string} file - Path to the file to check
- * @return {boolean} - Returns 0 (true) if recently processed, 1 (false) otherwise
- *
- * @example
- * if is_recently_processed "document.md"; then
- *     echo "Skipping recently processed file"
- * fi
- */
-is_recently_processed() {
-    local file="$1"
-    local file_timestamp=$(stat -f %m "$file" 2>/dev/null || echo 0)
-    local current_time=$(date +%s)
-    
-    if [[ "$ENABLE_INCREMENTAL_PROCESSING" == "true" ]]; then
-        # Check if file exists in processed database
-        if grep -q "^${file}|" "$PROCESSED_FILES_DB" 2>/dev/null; then
-            local db_timestamp=$(grep "^${file}|" "$PROCESSED_FILES_DB" | cut -d'|' -f3)
-            local time_diff=$((current_time - db_timestamp))
-            
-            # If file hasn't changed and was processed recently, skip it
-            if [[ $time_diff -lt $INCREMENTAL_THRESHOLD ]]; then
-                local db_file_timestamp=$(grep "^${file}|" "$PROCESSED_FILES_DB" | cut -d'|' -f4)
-                if [[ "$file_timestamp" == "$db_file_timestamp" ]]; then
-                    return 0  # Recently processed
-                fi
-            fi
-        fi
-    fi
-    
-    return 1  # Not recently processed
-}
-
-/**
- * Updates the processed files database with information about a processed file
- * Maintains a record of processed files for incremental processing
- *
- * @param {string} file - Path to the processed file
- * @param {string} hash - Content hash of the file
- * @param {string} category - Category assigned to the file
- * @return {void}
- *
- * @example
- * update_processed_db "document.md" "a1b2c3..." "Research Papers"
- */
-update_processed_db() {
-    local file="$1"
-    local hash="$2"
-    local category="$3"
-    local timestamp=$(date +%s)
-    local file_timestamp=$(stat -f %m "$file" 2>/dev/null || echo 0)
-    
-    # Remove old entry if exists
-    if [[ -f "$PROCESSED_FILES_DB" ]]; then
-        grep -v "^${file}|" "$PROCESSED_FILES_DB" > "$PROCESSED_FILES_DB.tmp" 2>/dev/null || true
-        mv "$PROCESSED_FILES_DB.tmp" "$PROCESSED_FILES_DB"
-    fi
-    
-    # Add new entry with format: filepath|hash|timestamp|category|file_timestamp
-    echo "${file}|${hash}|${timestamp}|${category}|${file_timestamp}" >> "$PROCESSED_FILES_DB"
-}
-
-/**
- * Validates and creates the required folder structure for document organization
- * Creates missing directories based on the selected categorization scheme
- *
- * @param {string} base_dir - Base directory where the folder structure should exist
- * @return {number} - Returns 0 on success, 1 on failure
- *
- * @example
- * validate_folder_structure "/path/to/documents"
- */
-validate_folder_structure() {
-    local base_dir="$1"
-    log "${BLUE}🔍 Validating folder structure in: $base_dir${NC}"
-    
-    # Check if base directory exists
-    if [[ ! -d "$base_dir" ]]; then
-        log "${RED}⚠️  Directory not found: $base_dir${NC}"
-        return 1
-    }
-    
-    local required_structure=()
-    
-    # Use simplified structure if enabled
-    if [[ "$ENABLE_SIMPLIFIED_CATEGORIZATION" == "true" ]]; then
-        # Simplified 5-category structure
-        # This structure provides a balance between organization and simplicity
-        required_structure=(
-            "🤖 AI & ML"                # Artificial Intelligence and Machine Learning content
-            "📚 Research Papers"        # Academic and research papers
-            "🌐 Web Content"            # Articles, guides, and web-saved content
-            "📝 Notes & Drafts"         # Personal notes and draft documents
-            "💻 Development"            # Programming and development resources
-            "🗄️ Archives/Duplicates"    # Storage for identified duplicate files
-            "🗄️ Archives/Legacy"        # Storage for outdated or replaced files
-            "🗄️ Archives/Quarantine"    # Storage for potentially problematic files
-        )
-        
-        # Add Inbox folder to each sync location
-        # Inbox folders serve as temporary storage for new files before categorization
-        for inbox_path in "${INBOX_LOCATIONS[@]}"; do
-            if [[ ! -d "$inbox_path" ]]; then
-                log "${YELLOW}📂 Creating Inbox folder: $inbox_path${NC}"
-                mkdir -p "$inbox_path"
-            fi
-        done
-        
-        # Add custom categories if they exist
-        # Custom categories allow users to extend the organization system
-        if [[ -f "$CUSTOM_CATEGORIES_FILE" ]]; then
-            while IFS='|' read -r cat_name cat_emoji cat_keywords cat_date; do
-                if [[ -n "$cat_name" && -n "$cat_emoji" ]]; then
-                    required_structure+=("$cat_emoji $cat_name")
-                fi
-            done < "$CUSTOM_CATEGORIES_FILE"
-        fi
-    else
-        # Enhanced folder structure with more granular categories (legacy)
-        # This structure provides detailed organization for specific use cases
-        required_structure=(
-            "📚 Research Papers/AI_ML"
-            "📚 Research Papers/Physics"
-            "📚 Research Papers/Neuroscience"
-            "📚 Research Papers/Mathematics"
-            "📚 Research Papers/Computer_Science"
-            "📚 Research Papers/Biology"
-            "🤖 AI & ML/Agents"
-            "🤖 AI & ML/Transformers"
-            "🤖 AI & ML/Neural_Networks"
-            "🤖 AI & ML/LLMs"
-            "🤖 AI & ML/Tools_Frameworks"
-            "🤖 AI & ML/Reinforcement_Learning"
-            "🤖 AI & ML/Computer_Vision"
-            "🤖 AI & ML/NLP"
-            "🤖 AI & ML/MLOps"
-            "💻 Development/APIs"
-            "💻 Development/Kubernetes"
-            "💻 Development/Git"
-            "💻 Development/Documentation"
-            "💻 Development/Databases"
-            "💻 Development/Frontend"
-            "💻 Development/Backend"
-            "💻 Development/DevOps"
-            "🌐 Web Content/Articles"
-            "🌐 Web Content/Tutorials"
-            "🌐 Web Content/Guides"
-            "🌐 Web Content/News"
-            "🌐 Web Content/Netclips"
-            "📝 Notes & Drafts/Daily_Notes"
-            "📝 Notes & Drafts/Literature_Notes"
-            "📝 Notes & Drafts/Untitled"
-            "📝 Notes & Drafts/Meeting_Notes"
-            "📝 Notes & Drafts/Ideas"
-            "🗄️ Archives/Duplicates"
-            "🗄️ Archives/Legacy"
-            "🗄️ Archives/Quarantine"
-            "🔬 Projects/Active"
-            "🔬 Projects/Completed"
-            "🔬 Projects/Ideas"
-            "📊 Data/Datasets"
-            "📊 Data/Analysis"
-            "📊 Data/Visualizations"
-        )
-    fi
-    
-    local missing_dirs=()
-    local created_dirs=0
-    
-    # Check for missing directories and track them
-    for dir in "${required_structure[@]}"; do
-        if [[ ! -d "$base_dir/$dir" ]]; then
-            missing_dirs+=("$dir")
-        fi
+        counter=$((counter + 1))
     done
     
-    # Create any missing directories
-    if [[ ${#missing_dirs[@]} -gt 0 ]]; then
-        log "${YELLOW}📂 Creating missing directories:${NC}"
-        for dir in "${missing_dirs[@]}"; do
-            log "${GREEN}   + $dir${NC}"
-            mkdir -p "$base_dir/$dir"
-            ((created_dirs++))
-        done
-        log "${GREEN}✅ Created $created_dirs directories${NC}"
+    # Move file
+    if [[ "$DRY_RUN_MODE" == "true" ]]; then
+        log "INFO" "DRY RUN: Would move $file -> $target_file"
     else
-        log "${GREEN}✅ Folder structure is complete${NC}"
-    fi
-}
-
-/**
- * Checks file integrity to identify potential issues
- * Validates file existence, readability, size, encoding, and content
- *
- * @param {string} file - Path to the file to check
- * @return {number} - Returns 0 if file passes all checks, 1 if issues found
- *
- * @example
- * if ! check_file_integrity "document.md"; then
- *     log "File integrity check failed"
- * fi
- */
-check_file_integrity() {
-    local file="$1"
-    local issues=()
-    
-    # Check if file exists and is readable
-    if [[ ! -f "$file" ]]; then
-        issues+=("File not found")
-        return 1
-    fi
-    
-    if [[ ! -r "$file" ]]; then
-        issues+=("File not readable")
-        return 1
-    fi
-    
-    # Check minimum file size
-    # Files that are too small are often corrupted or empty
-    local size=$(wc -c < "$file" 2>/dev/null || echo 0)
-    if [[ $size -lt $MIN_FILE_SIZE ]]; then
-        issues+=("File too small ($size bytes)")
-        return 1
-    fi
-    
-    # Check for binary content in text files
-    # Text files should not contain binary data
-    if [[ "$file" == *.md || "$file" == *.txt ]]; then
-        if file "$file" | grep -q "binary"; then
-            issues+=("Binary content in text file")
-            return 1
-        fi
-    fi
-    
-    # Check for corrupted UTF-8 encoding
-    # Markdown files should use valid UTF-8 encoding
-    if [[ "$file" == *.md ]]; then
-        if ! iconv -f utf-8 -t utf-8 "$file" >/dev/null 2>&1; then
-            issues+=("Invalid UTF-8 encoding")
-            return 1
-        fi
-    fi
-    
-    # Check for extremely long lines (potential corruption)
-    # Extremely long lines often indicate file corruption or binary content
-    if [[ "$file" == *.md ]]; then
-        local max_line_length=$(awk 'length > max_length { max_length = length } END { print max_length }' "$file" 2>/dev/null || echo 0)
-        if [[ $max_line_length -gt 10000 ]]; then
-            issues+=("Extremely long line detected ($max_line_length chars)")
+        if mv "$file" "$target_file"; then
+            log "INFO" "Moved: $file -> $target_file"
+        else
+            log "ERROR" "Failed to move: $file -> $target_file"
             return 1
         fi
     fi
@@ -497,188 +126,187 @@ check_file_integrity() {
     return 0
 }
 
-/**
- * Displays usage information and available commands
- * Provides help text for the module's command-line interface
- *
- * @return {void}
- *
- * @example
- * show_usage
- */
-show_usage() {
+# Organize files in a directory
+organize_directory() {
+    local dir="$1"
+    
+    if [[ ! -d "$dir" ]]; then
+        log "WARN" "Directory does not exist: $dir"
+        return 0
+    fi
+    
+    log "INFO" "Organizing directory: $dir"
+    
+    local files_processed=0
+    local files_moved=0
+    
+    # Find files to organize (exclude directories and hidden files)
+    while IFS= read -r -d '' file; do
+        # Skip if it's a directory
+        if [[ -d "$file" ]]; then
+            continue
+        fi
+        
+        # Skip hidden files
+        local filename=$(basename "$file")
+        if [[ "$filename" =~ ^\. ]]; then
+            continue
+        fi
+        
+        # Skip files that are too small
+        local file_size=$(stat -f%z "$file" 2>/dev/null || echo 0)
+        if [[ "$file_size" -lt "$MIN_FILE_SIZE" ]]; then
+            continue
+        fi
+        
+        # Skip if file is already in a category directory
+        local parent_dir=$(basename "$(dirname "$file")")
+        if [[ "$parent_dir" == "$CATEGORY_AI_ML" || "$parent_dir" == "$CATEGORY_RESEARCH" || 
+              "$parent_dir" == "$CATEGORY_WEB" || "$parent_dir" == "$CATEGORY_NOTES" || 
+              "$parent_dir" == "$CATEGORY_DEV" ]]; then
+            continue
+        fi
+        
+        files_processed=$((files_processed + 1))
+        
+        # Get category for file
+        local category=$(get_file_category "$file")
+        
+        # Move file to category
+        if move_to_category "$file" "$category" "$dir"; then
+            files_moved=$((files_moved + 1))
+        fi
+        
+    done < <(find "$dir" -maxdepth 1 -type f -print0)
+    
+    log "INFO" "Processed $files_processed files, moved $files_moved files"
+}
+
+# Show organization status
+show_status() {
+    log "INFO" "Organization status check"
+    
+    echo "=== Organization Configuration ==="
+    echo "Organization Enabled: $ORGANIZATION_ENABLED"
+    echo "Auto Categorization: $AUTO_CATEGORIZATION"
+    echo "Simplified Categories: $SIMPLIFIED_CATEGORIES"
+    echo "Dry Run Mode: $DRY_RUN_MODE"
+    echo ""
+    
+    echo "=== Categories ==="
+    echo "🤖 AI & ML: $CATEGORY_AI_ML"
+    echo "📚 Research Papers: $CATEGORY_RESEARCH"
+    echo "🌐 Web Content: $CATEGORY_WEB"
+    echo "📝 Notes & Drafts: $CATEGORY_NOTES"
+    echo "💻 Development: $CATEGORY_DEV"
+    echo ""
+    
+    if [[ -d "$SYNC_HUB" ]]; then
+        echo "=== Sync Hub Directory Analysis ==="
+        echo "Location: $SYNC_HUB"
+        
+        for category in "$CATEGORY_AI_ML" "$CATEGORY_RESEARCH" "$CATEGORY_WEB" "$CATEGORY_NOTES" "$CATEGORY_DEV"; do
+            local cat_dir="$SYNC_HUB/$category"
+            if [[ -d "$cat_dir" ]]; then
+                local file_count=$(find "$cat_dir" -type f | wc -l | tr -d ' ')
+                echo "$category: $file_count files"
+            else
+                echo "$category: Not created yet"
+            fi
+        done
+        
+        # Count uncategorized files
+        local uncategorized=0
+        while IFS= read -r -d '' file; do
+            local parent_dir=$(basename "$(dirname "$file")")
+            if [[ "$parent_dir" != "$CATEGORY_AI_ML" && "$parent_dir" != "$CATEGORY_RESEARCH" && 
+                  "$parent_dir" != "$CATEGORY_WEB" && "$parent_dir" != "$CATEGORY_NOTES" && 
+                  "$parent_dir" != "$CATEGORY_DEV" ]]; then
+                uncategorized=$((uncategorized + 1))
+            fi
+        done < <(find "$SYNC_HUB" -maxdepth 1 -type f -print0 2>/dev/null || true)
+        
+        echo "Uncategorized files: $uncategorized"
+    else
+        echo "Sync Hub directory does not exist: $SYNC_HUB"
+    fi
+}
+
+# Run organization process
+run_organization() {
+    log "INFO" "Starting organization process"
+    
+    if [[ "$ORGANIZATION_ENABLED" != "true" ]]; then
+        log "WARN" "Organization is disabled in configuration"
+        return 0
+    fi
+    
+    # Ensure sync hub exists
+    ensure_directory "$SYNC_HUB"
+    
+    # Organize the sync hub
+    organize_directory "$SYNC_HUB"
+    
+    log "INFO" "Organization process completed"
+}
+
+# Show help
+show_help() {
     cat << EOF
-Usage: $(basename "$0") [command] [options]
+Simplified Organize Module
+
+Usage: $0 <command> [options]
 
 Commands:
-  run                Run document organization
-  dry-run            Test organization without making changes
-  status             Check system status
-  create-category    Create a new custom category
-  process-inbox      Process files in Inbox folders
-
-Options:
-  --source DIR       Specify source directory (default: $SOURCE_DIR)
-  --force            Force organization even if there are sync inconsistencies
+    run         - Run the organization process
+    dry-run     - Preview what would be organized (no changes)
+    status      - Show organization status and statistics
+    help        - Show this help message
 
 Examples:
-  $(basename "$0") run
-  $(basename "$0") dry-run
-  $(basename "$0") status
-  $(basename "$0") create-category "Data Science" "📊" "data science,machine learning,statistics"
-  $(basename "$0") process-inbox
+    $0 run              # Organize files
+    $0 dry-run          # Preview organization
+    $0 status           # Check status
+
+Configuration:
+    Edit config.env to modify organization settings.
+    Set DRY_RUN_MODE=true in config.env for permanent dry-run mode.
+
+Categories:
+    🤖 AI & ML          - Machine learning, AI research, data science
+    📚 Research Papers  - Academic papers, studies, research documents  
+    🌐 Web Content      - Articles, tutorials, guides, bookmarks
+    📝 Notes & Drafts   - Meeting notes, ideas, drafts, personal notes
+    💻 Development      - Code, APIs, technical documentation
+
 EOF
 }
 
-run_organization() {
-    log "Starting organization process..."
-    initialize_cache
-    validate_folder_structure "$SOURCE_DIR"
-
-    # Find all files in the source directory
-    local files=()
-    while IFS= read -r -d '' file; do
-        files+=("$file")
-    done < <(find "$SOURCE_DIR" -type f -print0)
-
-    TOTAL_FILES=${#files[@]}
-    log "Found $TOTAL_FILES files to process."
-
-    for file in "${files[@]}"; do
-        ((PROCESSED_FILES++))
-        update_progress $PROCESSED_FILES $TOTAL_FILES "Processing files"
-
-        if ! check_file_integrity "$file"; then
-            log "${RED}Error: File integrity check failed for $file${NC}"
-            ((ERROR_FILES++))
-            continue
-        fi
-
-        local hash=$(calculate_content_hash "$file")
-        if grep -q "|$hash|" "$CONTENT_HASH_DB"; then
-            log "${YELLOW}Duplicate file found: $file${NC}"
-            ((DEDUPLICATED_FILES++))
-            # Handle duplicate files (e.g., move to a duplicates folder)
-            continue
-        fi
-
-        # Add to content hash db
-        echo "$hash|$file|$(stat -f %z "$file")|$(date +%s)" >> "$CONTENT_HASH_DB"
-
-        # Categorize and move the file
-        # This is a placeholder for the actual categorization logic
-        local category="Uncategorized"
-        log "Categorizing $file as $category"
-        ((CATEGORIZED_FILES++))
-
-        # Move the file to the category folder
-        local dest_dir="$SOURCE_DIR/$category"
-        mkdir -p "$dest_dir"
-        mv "$file" "$dest_dir/"
-        ((MOVED_FILES++))
-
-        update_processed_db "$file" "$hash" "$category"
-    done
-
-    log "Organization complete."
-    log "Summary: $MOVED_FILES files moved, $DEDUPLICATED_FILES duplicates found, $ERROR_FILES errors."
-
-    # Update metrics_data.json
-    local metrics_file="$PARENT_DIR/.gemini/metrics_data.json"
-    if [[ -f "$metrics_file" ]]; then
-        local current_metrics=$(cat "$metrics_file")
-        local current_organized=$(echo "$current_metrics" | jq -r '.documents_organized_last_24h')
-        local new_organized=$((current_organized + MOVED_FILES))
-
-        # Determine most active category (simple approach: just use the last categorized file's category)
-        local most_frequent_category="N/A"
-        if [[ -n "$CATEGORIZED_FILES" && "$CATEGORIZED_FILES" -gt 0 ]]; then
-            # This is a simplification. A real implementation would aggregate counts per category.
-            most_frequent_category=$(grep "^${file}|" "$PROCESSED_FILES_DB" | tail -n 1 | cut -d'|' -f4)
-        fi
-
-        local new_metrics=$(echo "$current_metrics" | jq \
-            --argjson organized "$new_organized" \
-            --arg category "$most_frequent_category" \
-            '.documents_organized_last_24h = $organized | .most_active_category = $category | .last_updated = "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"'
-        )
-        echo "$new_metrics" > "$metrics_file"
-        log "Updated metrics_data.json with organized files count and most active category."
-    fi
-}
-
-create_category() {
-    local name="$1"
-    local emoji="$2"
-    local keywords="$3"
-    local creation_date=$(date '+%Y-%m-%d')
-
-    echo "$name|$emoji|$keywords|$creation_date" >> "$CUSTOM_CATEGORIES_FILE"
-    log "${GREEN}Successfully created category: $emoji $name${NC}"
-}
-
-show_status() {
-    log "System Status:"
-    log "  - Total files processed: $PROCESSED_FILES"
-    log "  - Files moved: $MOVED_FILES"
-    log "  - Duplicates found: $DEDUPLICATED_FILES"
-    log "  - Errors: $ERROR_FILES"
-}
-
-process_inbox() {
-    for inbox in "${INBOX_LOCATIONS[@]}"; do
-        log "Processing inbox: $inbox"
-        # Add logic to process files in inbox locations
-    done
-}
-
-/**
- * Main function that processes command-line arguments and executes commands
- * Entry point for the module's functionality
- *
- * @param {string[]} args - Command-line arguments
- * @return {number} - Exit code (0 for success, non-zero for errors)
- *
- * @example
- * main "run" "--source" "/path/to/documents"
- */
+# Main execution
 main() {
-    if [[ "$#" -eq 0 ]]; then
-        show_usage
-        exit 1
-    fi
-    
-    local command="$1"
-    shift
-    
-    case "$command" in
-        run)
+    case "${1:-help}" in
+        "run")
             run_organization
             ;;
-        dry-run)
-            log "Running organization in dry-run mode..."
-            # Add dry-run logic here
+        "dry-run")
+            DRY_RUN_MODE="true"
+            run_organization
             ;;
-        status)
+        "status")
             show_status
             ;;
-        create-category)
-            if [[ "$#" -lt 3 ]]; then
-                log "${RED}❌ Missing parameters. Usage: create-category NAME EMOJI KEYWORDS${NC}"
-                exit 1
-            fi
-            create_category "$1" "$2" "$3"
-            ;;
-        process-inbox)
-            process_inbox
+        "help"|"--help"|"-h")
+            show_help
             ;;
         *)
-            echo "Unknown command: $command"
-            show_usage
+            echo "Unknown command: $1"
+            show_help
             exit 1
             ;;
     esac
 }
 
-# Run main function with all command-line arguments
-main "$@"
+# Run main function if script is executed directly
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

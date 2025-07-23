@@ -1,11 +1,16 @@
-root = /Users/moatasimfarooque/Downloads/Data_Science/Sync
-root = /Users/moatasimfarooque/icloud_sync
+# Unison profile for iCloud sync
+# Syncs between local sync hub and iCloud (Obsidian documents)
 
-# Unison options
+# Sync directories
+root = /Users/moatasimfarooque/Sync_Hub_New
+root = /Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync
+
+# Basic sync options
 auto = true
 batch = true
 prefer = newer
 log = true
+silent = false
 
 # Conflict resolution
 backup = Name *
@@ -13,7 +18,7 @@ backupcurr = Name *
 backupnot = Name *.tmp
 maxbackups = 5
 
-# Ignore patterns to avoid deadlocks
+# Standard ignore patterns
 ignore = Name .DS_Store
 ignore = Name .localized
 ignore = Name .Spotlight-V100
@@ -26,11 +31,11 @@ ignore = Name *~
 ignore = Name .#*
 ignore = Name #*#
 
-# Ignore iCloud sync files
+# iCloud specific ignores
 ignore = Name *.icloud
 ignore = Name .com.apple.timemachine.donotpresent
 
-# Enhanced ignore patterns for problematic files
+# Common problematic file patterns
 ignore = Regex .*:.*
 ignore = Regex .*".*
 ignore = Regex .*<.*
@@ -40,14 +45,30 @@ ignore = Name *.lock
 ignore = Name *.lnk
 ignore = Name desktop.ini
 ignore = Name Thumbs.db
-ignore = Name .dropbox*
-ignore = Name .sync*
 ignore = Name *conflicted copy*
 ignore = Name *conflict*
 
-# Performance and reliability settings
+# Ignore emoji-named directories that can cause sync issues
+ignore = Name 🎯*
+ignore = Name 💻*
+ignore = Name 📊*
+ignore = Name 📚*
+ignore = Name 📝*
+ignore = Regex .*[🎯💻📊📚📝].*
+
+# Version control and sync service files
+ignore = Name .git
+ignore = Name .gitignore
+ignore = Name .sync*
+ignore = Name .dropbox*
+
+# Obsidian files that might cause conflicts
+ignore = Name .obsidian*
+
+# Performance settings
 retry = 3
 confirmbigdel = false
+fastcheck = true
 fastcheck = true
 times = true
 perms = 0o644
