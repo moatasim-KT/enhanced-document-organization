@@ -51,22 +51,33 @@ ignore = Name Thumbs.db
 ignore = Name *conflicted copy*
 ignore = Name *conflict*
 
-# Ignore emoji-named directories that can cause sync issues
-ignore = Name 🎯*
-ignore = Name 💻*
-ignore = Name 📊*
-ignore = Name 📚*
-ignore = Name 📝*
-ignore = Regex .*[🎯💻📊📚📝].*
-
 # Version control and sync service files
 ignore = Name .git
 ignore = Name .gitignore
 ignore = Name .sync*
 ignore = Name .dropbox*
 
-# Obsidian files that might cause conflicts
-ignore = Name .obsidian*
+# Application-specific configuration files and directories (be selective)
+ignore = Name .obsidian
+ignore = Name .smart-env
+ignore = Name .vscode
+ignore = Name .idea
+ignore = Path .obsidian
+ignore = Path */.obsidian  
+ignore = Path .smart-env
+ignore = Path */.smart-env
+ignore = Path .vscode
+ignore = Path */.vscode
+ignore = Path .git
+ignore = Path */.git
+
+# Only ignore specific hidden files that cause problems (not all hidden files)
+ignore = Name .DS_Store
+ignore = Name .localized
+ignore = Name .Spotlight-V100
+ignore = Name .Trashes
+ignore = Name .fseventsd
+ignore = Name .TemporaryItems
 
 # Performance settings
 retry = 3
@@ -83,7 +94,6 @@ perms = 0o644
 # Performance optimizations for large datasets
 maxthreads = 4
 rsrc = false
-copythreshold = 1000
 
 # Exclude large file types that slow down sync
 ignore = Name *.pdf
@@ -99,14 +109,6 @@ ignore = Name *.tar.gz
 ignore = Name *.dmg
 
 # Exclude common large directories
-ignore = Path converted_images
-ignore = Path */converted_images
-ignore = Path random_forest_images
-ignore = Path */random_forest_images
-ignore = Path extracted_images
-ignore = Path */extracted_images
-ignore = Path images
-ignore = Path */images
 ignore = Path media
 ignore = Path */media
 
@@ -116,6 +118,9 @@ ignore = Path .smart-env
 ignore = Path */cache
 ignore = Path */temp
 ignore = Path */tmp
+ignore = Path */.cache
+ignore = Path */.tmp
+ignore = Path */.temp
 
 # Network optimization
 # servercmd = timeout 60s unison  # Disabled - causes syntax issues

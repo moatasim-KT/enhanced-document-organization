@@ -122,6 +122,84 @@ class DocumentOrganizationServer {
             type: 'object',
             properties: {}
           }
+        },
+        {
+          name: 'analyze_content',
+          description: 'Analyze content for duplicates and consolidation opportunities',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              file_paths: { type: 'array', items: { type: 'string' }, description: 'Array of file paths to analyze' },
+              similarity_threshold: { type: 'number', description: 'Similarity threshold (0-1)', default: 0.8 }
+            },
+            required: ['file_paths']
+          }
+        },
+        {
+          name: 'find_duplicates',
+          description: 'Find duplicate content across files',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              directory: { type: 'string', description: 'Directory to search for duplicates' },
+              similarity_threshold: { type: 'number', description: 'Similarity threshold (0-1)', default: 0.8 }
+            },
+            required: ['directory']
+          }
+        },
+        {
+          name: 'consolidate_content',
+          description: 'Consolidate similar content into unified documents',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              topic: { type: 'string', description: 'Topic to consolidate' },
+              file_paths: { type: 'array', items: { type: 'string' }, description: 'Files to consolidate' },
+              strategy: { type: 'string', description: 'Consolidation strategy', enum: ['simple_merge', 'structured_consolidation', 'comprehensive_merge'], default: 'comprehensive_merge' },
+              enhance_with_ai: { type: 'boolean', description: 'Use AI to enhance content', default: false }
+            },
+            required: ['topic', 'file_paths']
+          }
+        },
+        {
+          name: 'suggest_categories',
+          description: 'Suggest new categories based on content analysis',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              directory: { type: 'string', description: 'Directory to analyze for category suggestions' }
+            },
+            required: ['directory']
+          }
+        },
+        {
+          name: 'add_custom_category',
+          description: 'Add a custom category to the system',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Category name' },
+              icon: { type: 'string', description: 'Category icon/emoji' },
+              description: { type: 'string', description: 'Category description' },
+              keywords: { type: 'array', items: { type: 'string' }, description: 'Category keywords' },
+              file_patterns: { type: 'array', items: { type: 'string' }, description: 'File patterns' },
+              priority: { type: 'number', description: 'Category priority (1-10)', default: 5 }
+            },
+            required: ['name']
+          }
+        },
+        {
+          name: 'enhance_content',
+          description: 'Enhance content using AI for better flow and readability',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              content: { type: 'string', description: 'Content to enhance' },
+              topic: { type: 'string', description: 'Content topic/subject' },
+              enhancement_type: { type: 'string', description: 'Type of enhancement', enum: ['flow', 'structure', 'clarity', 'comprehensive'], default: 'comprehensive' }
+            },
+            required: ['content']
+          }
         }
       ]
     }));
@@ -147,6 +225,18 @@ class DocumentOrganizationServer {
             return await this.listCategories();
           case 'get_system_status':
             return await this.getSystemStatus();
+          case 'analyze_content':
+            return await this.analyzeContent(args);
+          case 'find_duplicates':
+            return await this.findDuplicates(args);
+          case 'consolidate_content':
+            return await this.consolidateContent(args);
+          case 'suggest_categories':
+            return await this.suggestCategories(args);
+          case 'add_custom_category':
+            return await this.addCustomCategory(args);
+          case 'enhance_content':
+            return await this.enhanceContent(args);
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
@@ -468,6 +558,272 @@ class DocumentOrganizationServer {
       };
     } catch (error) {
       throw new Error(`Failed to get system status: ${error.message}`);
+    }
+  }
+
+  // New Advanced Content Analysis Methods
+
+  async analyzeContent(args) {
+    try {
+      const { file_paths, similarity_threshold = 0.8 } = args;
+
+      // Import the ContentAnalyzer dynamically
+      const { ContentAnalyzer } = await import(path.join(this.projectRoot, 'organize', 'content_analyzer.js'));
+      const analyzer = new ContentAnalyzer({ similarityThreshold: similarity_threshold });
+
+      const results = new Map();
+
+      for (const filePath of file_paths) {
+        const fullPath = path.resolve(filePath);
+        const analysis = await analyzer.analyzeContent(fullPath);
+        if (analysis) {
+          results.set(filePath, analysis);
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              analysis_results: Object.fromEntries(results),
+              files_analyzed: file_paths.length,
+              successful_analyses: results.size,
+              timestamp: new Date().toISOString()
+            }, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Content analysis failed: ${error.message}`);
+    }
+  }
+
+  async findDuplicates(args) {
+    try {
+      const { directory, similarity_threshold = 0.8 } = args;
+
+      // Get all files in directory
+      const files = [];
+      const entries = await fs.readdir(directory, { withFileTypes: true });
+
+      for (const entry of entries) {
+        if (entry.isFile() && !entry.name.startsWith('.')) {
+          files.push(path.join(directory, entry.name));
+        }
+      }
+
+      // Import and use ContentAnalyzer
+      const { ContentAnalyzer } = await import(path.join(this.projectRoot, 'organize', 'content_analyzer.js'));
+      const analyzer = new ContentAnalyzer({ similarityThreshold: similarity_threshold });
+
+      const duplicates = await analyzer.findDuplicates(files);
+      const duplicateGroups = Array.from(duplicates.entries()).map(([key, group]) => ({
+        key,
+        type: group.type,
+        similarity: group.similarity,
+        files: group.files.map(f => f.filePath),
+        recommended_action: group.recommendedAction
+      }));
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              duplicate_groups: duplicateGroups,
+              total_files_scanned: files.length,
+              duplicate_groups_found: duplicateGroups.length,
+              exact_duplicates: duplicateGroups.filter(g => g.type === 'exact').length,
+              similar_content: duplicateGroups.filter(g => g.type === 'similar').length,
+              timestamp: new Date().toISOString()
+            }, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Duplicate detection failed: ${error.message}`);
+    }
+  }
+
+  async consolidateContent(args) {
+    try {
+      const { topic, file_paths, strategy = 'comprehensive_merge', enhance_with_ai = false } = args;
+
+      // Import ContentConsolidator
+      const { ContentConsolidator } = await import(path.join(this.projectRoot, 'organize', 'content_consolidator.js'));
+      const consolidator = new ContentConsolidator({
+        projectRoot: this.projectRoot,
+        enhanceContent: enhance_with_ai,
+        aiService: enhance_with_ai ? 'local' : 'none'
+      });
+
+      // Create consolidation candidate object
+      const consolidationCandidate = {
+        topic,
+        files: file_paths.map(filePath => ({
+          filePath,
+          analysis: { metadata: { suggestedTitle: path.basename(filePath, path.extname(filePath)) } }
+        })),
+        recommendedTitle: `${topic} - Consolidated`,
+        consolidationStrategy: strategy
+      };
+
+      const result = await consolidator.consolidateDocuments(consolidationCandidate);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              consolidation_result: {
+                success: result.success,
+                target_folder: result.targetFolder,
+                consolidated_document: result.consolidatedDocument,
+                original_files: result.originalFiles,
+                strategy_used: result.consolidationStrategy
+              },
+              topic,
+              files_consolidated: file_paths.length,
+              timestamp: new Date().toISOString()
+            }, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Content consolidation failed: ${error.message}`);
+    }
+  }
+
+  async suggestCategories(args) {
+    try {
+      const { directory } = args;
+
+      // Import CategoryManager
+      const { CategoryManager } = await import(path.join(this.projectRoot, 'organize', 'category_manager.js'));
+      const manager = new CategoryManager({
+        configPath: path.join(this.projectRoot, 'organize_config.conf'),
+        projectRoot: this.projectRoot
+      });
+      await manager.initialize();
+
+      // Import ContentAnalyzer
+      const { ContentAnalyzer } = await import(path.join(this.projectRoot, 'organize', 'content_analyzer.js'));
+      const analyzer = new ContentAnalyzer();
+
+      // Analyze files for poorly matched content
+      const allFiles = [];
+      const entries = await fs.readdir(directory, { withFileTypes: true });
+
+      for (const entry of entries) {
+        if (entry.isFile() && !entry.name.startsWith('.')) {
+          const filePath = path.join(directory, entry.name);
+          const analysis = await analyzer.analyzeContent(filePath);
+          if (analysis) {
+            const match = manager.findBestCategoryMatch(analysis);
+            allFiles.push({ filePath, analysis, match });
+          }
+        }
+      }
+
+      const poorlyMatched = allFiles.filter(f => f.match.confidence < 0.5);
+
+      let suggestion = null;
+      if (poorlyMatched.length >= 3) {
+        suggestion = await manager.suggestCategory(poorlyMatched[0].analysis, poorlyMatched);
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              category_suggestion: suggestion,
+              files_analyzed: allFiles.length,
+              poorly_categorized: poorlyMatched.length,
+              suggestion_available: suggestion !== null,
+              timestamp: new Date().toISOString()
+            }, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Category suggestion failed: ${error.message}`);
+    }
+  }
+
+  async addCustomCategory(args) {
+    try {
+      const { name, icon = '📁', description = '', keywords = [], file_patterns = [], priority = 5 } = args;
+
+      // Import CategoryManager
+      const { CategoryManager } = await import(path.join(this.projectRoot, 'organize', 'category_manager.js'));
+      const manager = new CategoryManager({
+        configPath: path.join(this.projectRoot, 'organize_config.conf'),
+        projectRoot: this.projectRoot
+      });
+      await manager.initialize();
+
+      const categoryData = {
+        name,
+        icon,
+        description,
+        keywords,
+        filePatterns: file_patterns,
+        priority
+      };
+
+      const newCategory = await manager.addCustomCategory(categoryData);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              category_added: newCategory,
+              success: true,
+              message: `Custom category "${name}" added successfully`,
+              timestamp: new Date().toISOString()
+            }, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Failed to add custom category: ${error.message}`);
+    }
+  }
+
+  async enhanceContent(args) {
+    try {
+      const { content, topic = 'General', enhancement_type = 'comprehensive' } = args;
+
+      // Import ContentConsolidator for AI enhancement
+      const { ContentConsolidator } = await import(path.join(this.projectRoot, 'organize', 'content_consolidator.js'));
+      const consolidator = new ContentConsolidator({
+        projectRoot: this.projectRoot,
+        enhanceContent: true,
+        aiService: 'local'
+      });
+
+      const enhancedContent = await consolidator.enhanceContentWithAI(content, topic);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              original_content: content.substring(0, 200) + (content.length > 200 ? '...' : ''),
+              enhanced_content: enhancedContent,
+              topic,
+              enhancement_type,
+              success: enhancedContent !== content,
+              timestamp: new Date().toISOString()
+            }, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Content enhancement failed: ${error.message}`);
     }
   }
 

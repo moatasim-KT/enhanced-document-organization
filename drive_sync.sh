@@ -78,15 +78,15 @@ run_sync() {
 
 # Run organization workflow
 run_organize() {
-    log "INFO" "Starting organization workflow"
+    log "INFO" "Starting enhanced organization workflow"
     
-    if [[ ! -x "$SCRIPT_DIR/organize/organize_module.sh" ]]; then
-        log "ERROR" "Organization module not found or not executable"
+    if [[ ! -x "$SCRIPT_DIR/organize/organize_module_enhanced.sh" ]]; then
+        log "ERROR" "Enhanced organization module not found or not executable"
         return 1
     fi
     
-    local mode="${1:-run}"
-    "$SCRIPT_DIR/organize/organize_module.sh" "$mode"
+    local dry_run="${1:-false}"
+    "$SCRIPT_DIR/organize/organize_module_enhanced.sh" "$SYNC_HUB" "$dry_run"
 }
 
 # Start MCP server
@@ -134,6 +134,11 @@ run_all() {
     log "INFO" "Starting complete workflow: sync → organize → sync"
     
     local organize_mode="${1:-run}"
+    local dry_run="false"
+    if [[ "$organize_mode" == "dry-run" ]]; then
+        dry_run="true"
+    fi
+    
     local success=true
     
     # Initial sync
@@ -143,7 +148,7 @@ run_all() {
     fi
     
     # Organization
-    if ! run_organize "$organize_mode"; then
+    if ! run_organize "$dry_run"; then
         log "ERROR" "Organization failed"
         success=false
     fi
@@ -210,7 +215,12 @@ main() {
             run_sync
             ;;
         "organize")
-            run_organize "${2:-run}"
+            local mode="${2:-run}"
+            local dry_run="false"
+            if [[ "$mode" == "dry-run" ]]; then
+                dry_run="true"
+            fi
+            run_organize "$dry_run"
             ;;
         "mcp")
             case "${2:-status}" in
