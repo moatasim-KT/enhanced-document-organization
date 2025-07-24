@@ -1,0 +1,12 @@
+-Clean up after creating a new version of a script with suffixes and prefixes like cleaned,enhanced, or fixed.
+-Remove any temporary files or artifacts that were created during the development process.
+-Ensure that the final version of the script is well-documented and adheres to the project's coding standards.
+-Verify that the script runs correctly and passes all tests before finalizing the version.
+-Update any relevant documentation to reflect the changes made in the new version.
+-Commit the final version of the script to the repository with a clear commit message indicating the changes made.
+-Tag the new version in the version control system to mark it as a stable release.
+-Dont create unnecesary markdown files, just one readme.md file is enough which should be updated with the latest information.
+-Ensure that the readme.md file includes instructions for usage, installation, and any dependencies required
+-Review the readme.md file for clarity and completeness before finalizing it.
+-Check for any remaining TODO comments in the code and address them before finalizing the version.
+-Ensure that all code is properly formatted and adheres to the project's style guidelines.
