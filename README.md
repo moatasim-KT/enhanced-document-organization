@@ -36,7 +36,7 @@ git clone <repository-url>
 cd Drive_sync
 ./setup.sh
 
-# 2. Configure your paths in config.env
+# 2. Configure your paths in config/config.env
 # Edit SYNC_HUB, ICLOUD_PATH, GOOGLE_DRIVE_PATH
 
 # 3. Run complete workflow with all AI features
@@ -51,33 +51,37 @@ cd Drive_sync
 ```
 Enhanced Document Organization System
 ├── drive_sync.sh                    # Main workflow orchestrator
-├── config.env                       # Centralized configuration
 ├── setup.sh                         # One-command installation
 │
-├── sync/                            # Cloud synchronization engine
-│   └── sync_module.sh               # Unison-based bidirectional sync
+├── config/                          # Configuration files
+│   ├── config.env                   # Centralized configuration
+│   ├── organize_config.conf         # Organization rules & patterns
+│   ├── unison_google_drive.prf      # Google Drive sync configuration
+│   └── unison_icloud.prf            # iCloud sync configuration
 │
-├── organize/                        # AI-powered organization
-│   ├── organize_module_enhanced.sh  # Enhanced organization workflow
-│   ├── content_analyzer.js          # Duplicate detection & analysis
-│   ├── content_consolidator.js      # AI-powered content merging
-│   └── category_manager.js          # Extensible category system
+├── logs/                            # Log files
+├── node_modules/                    # Node.js dependencies (for MCP server)
+├── src/                             # Source code for modules
+│   ├── mcp/                         # AI integration server
+│   │   ├── package-lock.json
+│   │   ├── package.json
+│   │   └── server.js
+│   ├── organize/                    # AI-powered organization
+│   │   ├── category_manager.js
+│   │   ├── content_analyzer.js
+│   │   ├── content_consolidator.js
+│   │   └── organize_module_enhanced.sh # Enhanced organization workflow
+│   └── sync/                        # Cloud synchronization engine
+│       └── sync_module.sh           # Unison-based bidirectional sync
 │
-├── mcp/                             # AI integration server
-│   ├── server.js                    # MCP server (12 AI tools)
-│   ├── package.json                 # Optimized dependencies
-│   └── node_modules/                # Essential packages only
-│
-├── ~/Sync_Hub_New/                  # User's organized document hub
-│   ├── AI & ML/                     # AI and machine learning content (49 files)
-│   ├── Research Papers/             # Academic and research documents (59 files)
-│   ├── Web Content/                 # Articles and web resources (20 files)
-│   ├── Notes & Drafts/              # Personal notes and drafts (57 files)
-│   ├── Development/                 # Technical documentation (6 files)
+├── ~/Sync_Hub_New/                  # User's organized document hub (example)
+│   ├── AI & ML/
+│   ├── Research Papers/
+│   ├── Web Content/
+│   ├── Notes & Drafts/
+│   ├── Development/
 │   └── Inbox/                       # Temporary staging area
 │
-├── organize_config.conf             # Organization rules & patterns
-├── unison_*.prf                     # Cloud sync configurations
 └── com.moatasim.*.plist            # macOS automation (LaunchAgent)
 ```
 
@@ -95,21 +99,20 @@ cd Drive_sync
 # Install system dependencies
 brew install unison node
 
-# Install Node.js packages (optimized - only 14 essential packages)
-cd mcp && npm install
+# Install Node.js packages
+cd src/mcp && npm install
 
 # Configure paths
-cp config.env.example config.env
-nano config.env
+cp config/config.env.example config/config.env
+nano config/config.env
 
 # Test installation
 ./drive_sync.sh status
-./test_enhanced_features.sh
 ```
 
 ## ⚙️ Configuration
 
-### Main Configuration (`config.env`)
+### Main Configuration (`config/config.env`)
 ```bash
 # === CORE PATHS ===
 SYNC_HUB="/Users/username/Sync_Hub_New"
@@ -215,7 +218,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "enhanced-document-organization": {
       "command": "node",
-      "args": ["/absolute/path/to/Drive_sync/mcp/server.js"],
+      "args": ["/absolute/path/to/Drive_sync/src/mcp/server.js"],
       "env": {}
     }
   }
@@ -267,7 +270,7 @@ Development/
 └── _category_info.md
 ```
 
-## � Current System Performance
+## 📊 Current System Performance
 
 ### Organization Results
 - **📊 Total Files Processed**: 191+ files across 5 categories
@@ -282,30 +285,6 @@ Development/
 - **AI Analysis Accuracy**: High-confidence categorization
 - **Storage Optimization**: Duplicate removal and content consolidation
 - **System Stability**: Comprehensive error handling and logging
-
-## � Installation & Setup
-
-### Automatic Setup (Recommended)
-```bash
-git clone <repository-url>
-cd Drive_sync
-./setup.sh
-```
-
-### Manual Installation
-```bash
-# Install system dependencies
-brew install unison node
-
-# Install Node.js packages
-cd mcp && npm install
-
-# Configure paths in config.env
-# Set SYNC_HUB, ICLOUD_PATH, GOOGLE_DRIVE_PATH
-
-# Test installation
-./drive_sync.sh status
-```
 
 ## 📝 Version Information
 

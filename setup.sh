@@ -39,7 +39,7 @@ echo ""
 # Setup directories
 echo "📁 Setting up directories..."
 
-source "$SCRIPT_DIR/config.env"
+source "$SCRIPT_DIR/config/config.env"
 
 # Create sync hub
 if [[ ! -d "$SYNC_HUB" ]]; then
