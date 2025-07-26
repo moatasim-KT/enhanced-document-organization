@@ -13,7 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Load configuration
-source "$PROJECT_DIR/config.env"
+source "$(dirname "$PROJECT_DIR")/config/config.env"
 
 # Logging function
 log() {
@@ -53,7 +53,7 @@ check_unison() {
 # Sync using Unison profile
 sync_with_unison() {
     local profile="$1"
-    local profile_path="$PROJECT_DIR/$profile.prf"
+    local profile_path="$(dirname "$PROJECT_DIR")/config/$profile.prf"
     
     if [[ ! -f "$profile_path" ]]; then
         log "ERROR" "Profile not found: $profile_path"

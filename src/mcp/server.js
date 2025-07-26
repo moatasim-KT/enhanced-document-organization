@@ -13,9 +13,11 @@ import {
   ListToolsRequestSchema,
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+
 import { promises as fs } from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
+import { ContentConsolidator } from '../organize/content_consolidator.js';
 
 class DocumentOrganizationServer {
   constructor() {
@@ -32,8 +34,8 @@ class DocumentOrganizationServer {
       }
     );
 
-    this.projectRoot = process.env.PROJECT_ROOT || path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
-    this.syncHub = process.env.SYNC_HUB || path.join(process.env.HOME, 'Sync_Hub_New');
+    this.projectRoot = '/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync';
+    this.syncHub = '/Users/moatasimfarooque/Sync_Hub_New';
 
     this.setupToolHandlers();
     this.setupResourceHandlers();
@@ -407,7 +409,7 @@ class DocumentOrganizationServer {
     const { dry_run = false } = args;
 
     try {
-      const command = `cd "${this.projectRoot}" && ./organize/organize_module.sh ${dry_run ? 'dry-run' : 'run'}`;
+      const command = `cd "${this.projectRoot}" && ./src/organize/organize_module.sh ${dry_run ? 'dry-run' : 'run'}`;
       const output = execSync(command, { encoding: 'utf8' });
 
       return {
@@ -484,7 +486,7 @@ class DocumentOrganizationServer {
           {
             type: 'text',
             text: JSON.stringify({
-              sync_hub: this.syncHub,
+              sync_hub: '/Users/moatasimfarooque/Sync_Hub_New',
               categories: stats,
               total_files: Object.values(stats).reduce((a, b) => a + b, 0),
               last_updated: new Date().toISOString()
@@ -568,7 +570,7 @@ class DocumentOrganizationServer {
       const { file_paths, similarity_threshold = 0.8 } = args;
 
       // Import the ContentAnalyzer dynamically
-      const { ContentAnalyzer } = await import(path.join(this.projectRoot, 'organize', 'content_analyzer.js'));
+      const { ContentAnalyzer } = await import('../organize/content_analyzer.js');
       const analyzer = new ContentAnalyzer({ similarityThreshold: similarity_threshold });
 
       const results = new Map();
@@ -614,7 +616,7 @@ class DocumentOrganizationServer {
       }
 
       // Import and use ContentAnalyzer
-      const { ContentAnalyzer } = await import(path.join(this.projectRoot, 'organize', 'content_analyzer.js'));
+      const { ContentAnalyzer } = await import('../organize/content_analyzer.js');
       const analyzer = new ContentAnalyzer({ similarityThreshold: similarity_threshold });
 
       const duplicates = await analyzer.findDuplicates(files);
@@ -650,8 +652,6 @@ class DocumentOrganizationServer {
     try {
       const { topic, file_paths, strategy = 'comprehensive_merge', enhance_with_ai = false } = args;
 
-      // Import ContentConsolidator
-      const { ContentConsolidator } = await import(path.join(this.projectRoot, 'organize', 'content_consolidator.js'));
       const consolidator = new ContentConsolidator({
         projectRoot: this.projectRoot,
         enhanceContent: enhance_with_ai,
@@ -700,7 +700,7 @@ class DocumentOrganizationServer {
       const { directory } = args;
 
       // Import CategoryManager
-      const { CategoryManager } = await import(path.join(this.projectRoot, 'src', 'organize', 'category_manager.js'));
+      const { CategoryManager } = await import('../organize/category_manager.js');
       const manager = new CategoryManager({
         configPath: path.join(this.projectRoot, 'organize_config.conf'),
         projectRoot: this.projectRoot
@@ -708,7 +708,7 @@ class DocumentOrganizationServer {
       await manager.initialize();
 
       // Import ContentAnalyzer
-      const { ContentAnalyzer } = await import(path.join(this.projectRoot, 'organize', 'content_analyzer.js'));
+      const { ContentAnalyzer } = await import('../organize/content_analyzer.js');
       const analyzer = new ContentAnalyzer();
 
       // Analyze files for poorly matched content
@@ -757,7 +757,7 @@ class DocumentOrganizationServer {
       const { name, icon = '📁', description = '', keywords = [], file_patterns = [], priority = 5 } = args;
 
       // Import CategoryManager
-      const { CategoryManager } = await import(path.join(this.projectRoot, 'src', 'organize', 'category_manager.js'));
+      const { CategoryManager } = await import('../organize/category_manager.js');
       const manager = new CategoryManager({
         configPath: path.join(this.projectRoot, 'organize_config.conf'),
         projectRoot: this.projectRoot
@@ -797,8 +797,7 @@ class DocumentOrganizationServer {
     try {
       const { content, topic = 'General', enhancement_type = 'comprehensive' } = args;
 
-      // Import ContentConsolidator for AI enhancement
-      const { ContentConsolidator } = await import(path.join(this.projectRoot, 'organize', 'content_consolidator.js'));
+
       const consolidator = new ContentConsolidator({
         projectRoot: this.projectRoot,
         enhanceContent: true,
@@ -835,4 +834,10 @@ class DocumentOrganizationServer {
 }
 
 const server = new DocumentOrganizationServer();
+server.addCustomCategory({
+  name: '📂 Https',
+  icon: '📂',
+  description: 'Auto-suggested category for https, with, this, learning, code content',
+  keywords: ['https', 'with', 'this', 'learning', 'code']
+}).then(() => console.log('Category added directly.')).catch(console.error);
 server.run().catch(console.error);

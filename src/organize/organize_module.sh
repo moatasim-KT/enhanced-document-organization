@@ -13,7 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Load configuration
-source "$PROJECT_DIR/config/config.env"
+source "$(dirname "$PROJECT_DIR")/config/config.env"
 
 # Advanced features configuration
 ENABLE_DUPLICATE_DETECTION="${ENABLE_DUPLICATE_DETECTION:-true}"
@@ -61,7 +61,7 @@ organize_documents() {
         if [[ -f "$file" && ! "$file" =~ /\. && ! "$file" =~ _category_info\.md$ ]]; then
             files_to_process+=("$file")
         fi
-    done < <(find "$source_dir" -maxdepth 1 -type f -print0)
+    done < <(find "$source_dir" -maxdepth 3 -type f -print0)
     
     if [[ ${#files_to_process[@]} -eq 0 ]]; then
         log "INFO" "No files to process"
@@ -200,53 +200,47 @@ process_duplicates() {
     local duplicates_file="$1"
     local dry_run="$2"
     
-    if [[ ! -f "$duplicates_file" ]]; then
-        return 0
-    fi
-    
-    local duplicate_count=$(node -e "
-        const fs = require('fs');
-        const duplicates = JSON.parse(fs.readFileSync('$duplicates_file', 'utf-8'));
-        console.log(duplicates.length);
-    ")
-    
-    if [[ "$duplicate_count" -gt 0 ]]; then
-        log "INFO" "Processing $duplicate_count duplicate groups"
-        
-        node -e "
-            const fs = require('fs');
-            const path = require('path');
+        # Process files in Inbox and root directory
+        while IFS= read -r -d '' file; do
+            # Skip hidden files and category info files
+            if [[ "$(basename "$file")" =~ ^\. ]] || [[ "$(basename "$file")" =~ _category_info\.md$ ]]; then
+                continue
+            fi
             
-            const duplicatesEntries = JSON.parse(fs.readFileSync('$duplicates_file', 'utf-8'));
+            # Determine the correct category for the file
+            local category=$(get_file_category_enhanced "$file")
+            local category_dir="$source_dir/$category"
             
-            for (const [key, duplicateGroup] of duplicatesEntries) {
-                const { type, similarity, files, recommendedAction } = duplicateGroup;
-                
-                console.log(\`Duplicate group: \${key} (similarity: \${similarity ? similarity.toFixed(2) : 'N/A'})\`);
-                console.log(\`Action: \${recommendedAction}\`);
-                
-                if (type === 'exact' && files.length > 1) {
-                    // Keep the first file, mark others for removal
-                    const keepFile = files[0].filePath;
-                    const removeFiles = files.slice(1).map(f => f.filePath);
-                    
-                    console.log(\`Keeping: \${keepFile}\`);
-                    for (const removeFile of removeFiles) {
-                        console.log(\`$dry_run\" === \"true\" ? \"Would remove\" : \"Removing\"}: \${removeFile}\`);
-                        if ('$dry_run' !== 'true') {
-                            try {
-                                fs.unlinkSync(removeFile);
-                            } catch (error) {
-                                console.warn(\`Failed to remove \${removeFile}: \${error.message}\`);
-                            }
-                        }
-                    }
-                }
-            }
-        "
-    fi
-}
-
+            ensure_directory "$category_dir"
+            
+            local filename=$(basename "$file")
+            local target_path="$category_dir/$filename"
+            
+            # If the file is not in the correct category folder, move it
+            local file_dir=$(dirname "$file")
+            if [[ "$file_dir" != "$category_dir" ]]; then
+                # Handle filename conflicts
+                if [[ -e "$target_path" && "$target_path" != "$file" ]]; then
+                    local base_name="${filename%.*}"
+                    local extension="${filename##*.}"
+                    local counter=1
+                    while [[ -e "$category_dir/${base_name}_${counter}.${extension}" ]]; do
+                        ((counter++))
+                    done
+                    target_path="$category_dir/${base_name}_${counter}.${extension}"
+                    filename="${base_name}_${counter}.${extension}"
+                fi
+                if [[ "$dry_run" == "true" ]]; then
+                    log "INFO" "DRY RUN: Would move $file -> $target_path"
+                else
+                    log "INFO" "Moved: $file -> $target_path"
+                    mv "$file" "$target_path"
+                    ((moved_count++))
+                fi
+            fi
+            ((processed_count++))
+            
+        done < <(find "$source_dir" -type f -print0)
 # Process content consolidation candidates
 process_consolidation_candidates() {
     local candidates_file="$1"
@@ -318,7 +312,7 @@ process_consolidation_candidates() {
 
 # Organize remaining files using traditional + enhanced categorization
 organize_remaining_files() {
-    local source_dir="$1"
+    local source_dir="/Users/moatasimfarooque/Sync_Hub_New"
     local dry_run="$2"
     
     local processed_count=0
@@ -337,7 +331,7 @@ organize_remaining_files() {
         fi
         
         local category=$(get_file_category_enhanced "$file")
-        local category_dir="$source_dir/$category"
+    local category_dir="$source_dir/$category"
         
         ensure_directory "$category_dir"
         
@@ -410,7 +404,7 @@ get_file_category_enhanced() {
 
 # Check for category suggestions based on unmatched content
 check_category_suggestions() {
-    local source_dir="$1"
+    local source_dir="/Users/moatasimfarooque/Sync_Hub_New"
     
     log "INFO" "Analyzing content for potential new categories..."
     
@@ -434,7 +428,7 @@ check_category_suggestions() {
             const categories = ['${CATEGORY_AI_ML:-AI & ML}', '${CATEGORY_RESEARCH:-Research Papers}', '${CATEGORY_WEB:-Web Content}', '${CATEGORY_NOTES:-Notes & Drafts}', '${CATEGORY_DEV:-Development}'];
             
             for (const category of categories) {
-                const categoryPath = path.join('${source_dir}', category);
+                const categoryPath = path.join('/Users/moatasimfarooque/Sync_Hub_New', category);
                 try {
                     const files = await fs.readdir(categoryPath);
                     for (const file of files) {
@@ -533,8 +527,19 @@ get_file_category_simple() {
 
 # Main execution
 main() {
-    local source_dir="${1:-$SYNC_HUB}"
+    local command="${1:-run}"
+    local source_dir=""
     local dry_run="${2:-false}"
+
+    case "$command" in
+        "run")
+            source_dir="$SYNC_HUB"
+            ;;
+        *)
+            source_dir="$command"
+            dry_run="${2:-false}"
+            ;;
+    esac
     
     if [[ ! -d "$source_dir" ]]; then
         log "ERROR" "Source directory does not exist: $source_dir"

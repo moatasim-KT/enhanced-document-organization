@@ -355,22 +355,22 @@ Please return only the enhanced content in markdown format, without any explanat
         const topics = analysis.topics.join(' ').toLowerCase();
 
         if (topics.includes('ai') || topics.includes('machine') || topics.includes('neural')) {
-            return '🤖 AI & ML';
+            return 'AI & ML';
         }
         if (topics.includes('research') || topics.includes('paper') || topics.includes('study')) {
-            return '📚 Research Papers';
+            return 'Research Papers';
         }
         if (topics.includes('web') || topics.includes('article') || topics.includes('tutorial')) {
-            return '🌐 Web Content';
+            return 'Web Content';
         }
         if (topics.includes('note') || topics.includes('idea') || topics.includes('draft')) {
-            return '📝 Notes & Drafts';
+            return 'Notes & Drafts';
         }
         if (topics.includes('code') || topics.includes('api') || topics.includes('development')) {
-            return '💻 Development';
+            return 'Development';
         }
 
-        return '📝 Notes & Drafts'; // Default category
+        return 'Notes & Drafts'; // Default category
     }
 
     createDocumentHeader(contents) {

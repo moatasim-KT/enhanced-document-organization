@@ -38,8 +38,8 @@ export class CategoryManager {
         const defaultCategories = [
             {
                 id: 'ai_ml',
-                name: '🤖 AI & ML',
-                icon: '🤖',
+                name: 'AI & ML',
+                icon: '',
                 description: 'Artificial Intelligence and Machine Learning content',
                 keywords: ['ai', 'artificial intelligence', 'machine learning', 'ml', 'neural', 'deep learning', 'tensorflow', 'pytorch', 'model', 'algorithm', 'data science'],
                 filePatterns: ['*.ipynb', '*ai*', '*ml*', '*neural*', '*model*'],
@@ -51,8 +51,8 @@ export class CategoryManager {
             },
             {
                 id: 'research_papers',
-                name: '📚 Research Papers',
-                icon: '📚',
+                name: 'Research Papers',
+                icon: '',
                 description: 'Academic papers, studies, and research documents',
                 keywords: ['research', 'paper', 'study', 'journal', 'arxiv', 'academic', 'publication', 'thesis', 'dissertation', 'analysis'],
                 filePatterns: ['*.pdf', '*paper*', '*research*', '*study*', '*arxiv*'],
@@ -64,8 +64,8 @@ export class CategoryManager {
             },
             {
                 id: 'web_content',
-                name: '🌐 Web Content',
-                icon: '🌐',
+                name: 'Web Content',
+                icon: '',
                 description: 'Articles, tutorials, guides, and web resources',
                 keywords: ['article', 'tutorial', 'guide', 'blog', 'web', 'how-to', 'walkthrough', 'tips', 'tricks', 'resource'],
                 filePatterns: ['*.html', '*article*', '*tutorial*', '*guide*', '*blog*'],
@@ -77,8 +77,8 @@ export class CategoryManager {
             },
             {
                 id: 'notes_drafts',
-                name: '📝 Notes & Drafts',
-                icon: '📝',
+                name: 'Notes & Drafts',
+                icon: '',
                 description: 'Personal notes, ideas, drafts, and meeting notes',
                 keywords: ['note', 'notes', 'draft', 'idea', 'meeting', 'todo', 'brainstorm', 'thoughts', 'memo', 'reminder'],
                 filePatterns: ['*note*', '*draft*', '*idea*', '*meeting*', '*todo*'],
@@ -90,8 +90,8 @@ export class CategoryManager {
             },
             {
                 id: 'development',
-                name: '💻 Development',
-                icon: '💻',
+                name: 'Development',
+                icon: '',
                 description: 'Code, APIs, technical documentation, and development resources',
                 keywords: ['code', 'api', 'development', 'programming', 'software', 'technical', 'documentation', 'framework', 'library', 'tool'],
                 filePatterns: ['*.js', '*.py', '*.md', '*api*', '*code*', '*dev*'],
