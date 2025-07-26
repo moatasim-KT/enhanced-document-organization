@@ -10,7 +10,7 @@ import path from 'path';
 
 export class CategoryManager {
     constructor(options = {}) {
-        this.configPath = options.configPath || 'organize_config.conf';
+        this.configPath = options.configPath || path.join(this.projectRoot, 'config', 'organize_config.conf');
         this.projectRoot = options.projectRoot;
         this.categories = new Map();
         this.customCategories = new Map();

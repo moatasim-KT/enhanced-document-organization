@@ -431,7 +431,7 @@ class DocumentOrganizationServer {
     const { service = 'all' } = args;
 
     try {
-      const command = `cd "${this.projectRoot}" && ./sync/sync_module.sh ${service}`;
+      const command = `cd "${this.projectRoot}" && ./src/sync/sync_module.sh ${service}`;
       const output = execSync(command, { encoding: 'utf8' });
 
       return {
@@ -700,7 +700,7 @@ class DocumentOrganizationServer {
       const { directory } = args;
 
       // Import CategoryManager
-      const { CategoryManager } = await import(path.join(this.projectRoot, 'organize', 'category_manager.js'));
+      const { CategoryManager } = await import(path.join(this.projectRoot, 'src', 'organize', 'category_manager.js'));
       const manager = new CategoryManager({
         configPath: path.join(this.projectRoot, 'organize_config.conf'),
         projectRoot: this.projectRoot
@@ -757,7 +757,7 @@ class DocumentOrganizationServer {
       const { name, icon = '📁', description = '', keywords = [], file_patterns = [], priority = 5 } = args;
 
       // Import CategoryManager
-      const { CategoryManager } = await import(path.join(this.projectRoot, 'organize', 'category_manager.js'));
+      const { CategoryManager } = await import(path.join(this.projectRoot, 'src', 'organize', 'category_manager.js'));
       const manager = new CategoryManager({
         configPath: path.join(this.projectRoot, 'organize_config.conf'),
         projectRoot: this.projectRoot

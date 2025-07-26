@@ -10,7 +10,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Load configuration
-source "$SCRIPT_DIR/config.env"
+source "$SCRIPT_DIR/config/config.env"
 
 # Logging function
 log() {
@@ -54,7 +54,7 @@ show_status() {
     
     echo "--- MCP Server ---"
     if [[ "$MCP_ENABLED" == "true" ]]; then
-        if pgrep -f "mcp/server.js" >/dev/null; then
+        if pgrep -f "src/mcp/server.js" >/dev/null; then
             echo "MCP Server: ✅ Running"
         else
             echo "MCP Server: ❌ Not running"
@@ -98,17 +98,17 @@ start_mcp() {
         return 0
     fi
     
-    if pgrep -f "mcp/server.js" >/dev/null; then
+    if pgrep -f "src/mcp/server.js" >/dev/null; then
         log "INFO" "MCP server is already running"
         return 0
     fi
     
-    if [[ ! -f "$SCRIPT_DIR/mcp/server.js" ]]; then
+    if [[ ! -f "$SCRIPT_DIR/src/mcp/server.js" ]]; then
         log "ERROR" "MCP server not found"
         return 1
     fi
     
-    cd "$SCRIPT_DIR/mcp"
+    cd "$SCRIPT_DIR/src/mcp"
     if [[ "${1:-background}" == "background" ]]; then
         nohup node server.js > /dev/null 2>&1 &
         log "INFO" "MCP server started in background"
@@ -121,8 +121,8 @@ start_mcp() {
 stop_mcp() {
     log "INFO" "Stopping MCP server"
     
-    if pgrep -f "mcp/server.js" >/dev/null; then
-        pkill -f "mcp/server.js"
+    if pgrep -f "src/mcp/server.js" >/dev/null; then
+        pkill -f "src/mcp/server.js"
         log "INFO" "MCP server stopped"
     else
         log "INFO" "MCP server was not running"
@@ -231,8 +231,8 @@ main() {
                     stop_mcp
                     ;;
                 "status")
-                    if pgrep -f "mcp/server.js" >/dev/null; then
-                        echo "MCP Server: ✅ Running (PID: $(pgrep -f 'mcp/server.js'))"
+                    if pgrep -f "src/mcp/server.js" >/dev/null; then
+                        echo "MCP Server: ✅ Running (PID: $(pgrep -f 'src/mcp/server.js'))"
                     else
                         echo "MCP Server: ❌ Not running"
                     fi
