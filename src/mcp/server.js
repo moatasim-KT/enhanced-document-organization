@@ -1149,6 +1149,7 @@ export class DocumentOrganizationServer {
             text: JSON.stringify({
               success: true,
               dry_run,
+              summary: `Document organization ${dry_run ? 'simulation' : 'execution'} completed successfully`,
               output: output.trim(),
               timestamp: new Date().toISOString()
             }, null, 2)
@@ -1175,7 +1176,9 @@ export class DocumentOrganizationServer {
             text: JSON.stringify({
               success: true,
               service,
-              output: output.trim()
+              status: 'completed',
+              output: output.trim(),
+              timestamp: new Date().toISOString()
             }, null, 2)
           }
         ]
@@ -1286,6 +1289,7 @@ export class DocumentOrganizationServer {
           {
             type: 'text',
             text: JSON.stringify({
+              status: 'running',
               system_status: 'running',
               configuration: configStatus,
               drive_sync_status: driveStatus,
@@ -1324,7 +1328,9 @@ export class DocumentOrganizationServer {
           {
             type: 'text',
             text: JSON.stringify({
+              analysis: Object.fromEntries(results),
               analysis_results: Object.fromEntries(results),
+              file_paths: file_paths,
               files_analyzed: file_paths.length,
               successful_analyses: results.size,
               timestamp: new Date().toISOString()
@@ -1371,6 +1377,8 @@ export class DocumentOrganizationServer {
           {
             type: 'text',
             text: JSON.stringify({
+              directory: directory,
+              duplicates: duplicateGroups,
               duplicate_groups: duplicateGroups,
               total_files_scanned: files.length,
               duplicate_groups_found: duplicateGroups.length,
@@ -1632,11 +1640,12 @@ export class DocumentOrganizationServer {
           {
             type: 'text',
             text: JSON.stringify({
+              directory: directory,
+              suggestions: suggestion ? [suggestion] : [],
               category_suggestion: suggestion,
               files_analyzed: allFiles.length,
               poorly_categorized: poorlyMatched.length,
               suggestion_available: suggestion !== null,
-              directory: directory,
               timestamp: new Date().toISOString()
             }, null, 2)
           }
