@@ -54,27 +54,64 @@ node test/mcp/test_mcp_tools.js
 
 ## Test Categories
 
-### 1. System Validation Tests (`organize/test_system_validation.js`)
+### 1. Comprehensive Test Suite (`comprehensive_test_suite.js`)
+- **Primary test suite covering all critical functionality**
+- ContentConsolidator path management fixes
+- Complete organization workflow integration
+- MCP server tool functionality
+- Dry-run functionality validation
+- End-to-end testing with real scenarios
+
+### 2. ContentConsolidator Path Management Tests (`organize/test_content_consolidator_paths.js`)
+- Constructor accepts syncHubPath parameter
+- createConsolidatedFolder uses provided path
+- Path construction methods use configurable paths
+- Error handling for missing syncHubPath
+- Path validation and sanitization
+- Dry-run path behavior
+- Multiple sync hub configurations
+- Path resolution edge cases
+
+### 3. Complete Workflow Integration Tests (`organize/test_complete_workflow_integration.js`)
+- Configuration loading and validation
+- Content analysis workflow
+- Batch processing workflow
+- Organization workflow execution
+- Content consolidation workflow
+- End-to-end workflow integration
+- Error recovery and resilience
+
+### 4. Enhanced MCP Server Tests (`mcp/test_mcp_tools.js`)
+- All 18 MCP tools functionality
+- Tool validation and argument checking
+- Individual tool functions
+- Error handling in tools
+- Tool response formatting
+- Tool execution safety wrapper
+
+### 5. Dry-Run Functionality Tests (`organize/test_dry_run_functionality.js`)
+- organize_module.sh dry-run functionality
+- ContentConsolidator dry-run mode
+- BatchProcessor dry-run functionality
+- File system state verification
+- Dry-run output validation
+
+### 6. System Validation Tests (`organize/test_system_validation.js`)
 - Comprehensive system validation
 - Dependency checking
 - Configuration validation
 - Integration testing
 
-### 2. Error Handling Tests (`organize/test_enhanced_error_system.js`)
+### 7. Error Handling Tests (`organize/test_enhanced_error_system.js`)
 - Error classification and handling
 - Async error handling
 - Recovery strategies
 - Logging functionality
 
-### 3. Module Import Tests (`organize/test_module_imports.js`)
+### 8. Module Import Tests (`organize/test_module_imports.js`)
 - Module loading and resolution
 - Import path validation
 - Fallback mechanisms
-
-### 4. MCP Server Tests (`mcp/test_mcp_tools.js`)
-- MCP tool functionality
-- Server initialization
-- Tool execution and responses
 
 ## Test Data
 
@@ -138,12 +175,40 @@ These tests can be integrated into CI/CD pipelines:
 
 ## Test Coverage
 
-The test suite covers:
+The comprehensive test suite covers:
+- ✅ **ContentConsolidator path management fixes** (Task requirement 1)
+- ✅ **Complete organization workflow integration** (Task requirement 2)
+- ✅ **MCP server tool functionality verification** (Task requirement 3)
+- ✅ **Dry-run functionality validation** (Task requirement 4)
 - ✅ System validation and dependency checking
 - ✅ Error handling and recovery
 - ✅ Module loading and imports
-- ✅ MCP server functionality
 - ✅ Configuration validation
-- ✅ Integration testing
+- ✅ End-to-end workflow testing
+- ✅ Error recovery and resilience
+- ✅ Path validation and sanitization
+- ✅ Batch processing workflows
+
+## Running Specific Test Categories
+
+### Run the main comprehensive test suite (recommended):
+```bash
+node test/comprehensive_test_suite.js
+```
+
+### Run specific test categories:
+```bash
+# ContentConsolidator path management tests
+node test/organize/test_content_consolidator_paths.js
+
+# Complete workflow integration tests
+node test/organize/test_complete_workflow_integration.js
+
+# Enhanced MCP server tests
+node test/mcp/test_mcp_tools.js
+
+# Dry-run functionality tests
+node test/organize/test_dry_run_functionality.js
+```
 
 For detailed test results and coverage reports, run the test suite with verbose output.

@@ -2,7 +2,7 @@
 # Syncs between local sync hub and Google Drive
 
 # Sync directories
-root = /Users/moatasimfarooque/Sync_Hub_New
+root = $SYNC_HUB
 root = /Users/moatasimfarooque/Library/CloudStorage/GoogleDrive-moatasim23android@gmail.com/My Drive/Sync
 
 # Basic sync options

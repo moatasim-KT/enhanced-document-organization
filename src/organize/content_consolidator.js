@@ -18,6 +18,7 @@ export class ContentConsolidator {
         this.outputFormat = options.outputFormat || 'markdown';
         this.preserveReferences = options.preserveReferences !== false;
         this.enhanceContent = options.enhanceContent !== false;
+        this.dryRun = options.dryRun || false; // Dry run mode
 
         // Initialize error handler
         this.errorHandler = createErrorHandler('ContentConsolidator', {
@@ -111,16 +112,16 @@ export class ContentConsolidator {
                 );
             }
 
-            // Create folder structure with error handling
+            // Create folder structure with error handling (or simulate in dry-run)
             const folderName = this.sanitizeFolderName(consolidationCandidate.recommendedTitle || topic);
             const targetFolder = await this.createConsolidatedFolder(folderName, validFiles[0].analysis);
 
             // Extract and merge content with comprehensive error handling
             const mergedContent = await this.mergeContent(validFiles, consolidationStrategy);
 
-            // Enhance content with AI if enabled
+            // Enhance content with AI if enabled (skip in dry-run to save time)
             let enhancedContent = mergedContent;
-            if (this.enhanceContent) {
+            if (this.enhanceContent && !this.dryRun) {
                 try {
                     enhancedContent = await this.enhanceContentWithAI(mergedContent, topic);
                 } catch (error) {
@@ -131,16 +132,18 @@ export class ContentConsolidator {
                     });
                     // Continue with unenhanced content
                 }
+            } else if (this.enhanceContent && this.dryRun) {
+                await this.errorHandler.logInfo('DRY RUN: Skipping AI enhancement to save time', { topic });
             }
 
-            // Create the consolidated document
+            // Create the consolidated document (or simulate in dry-run)
             const consolidatedDoc = await this.createConsolidatedDocument(
                 enhancedContent,
                 consolidationCandidate,
                 targetFolder
             );
 
-            // Move reference materials with error handling
+            // Move reference materials with error handling (or simulate in dry-run)
             await this.moveReferenceMaterials(validFiles, targetFolder);
 
             await this.errorHandler.logInfo('Document consolidation completed successfully', {
@@ -168,11 +171,26 @@ export class ContentConsolidator {
     async createConsolidatedFolder(folderName, sampleAnalysis) {
         return await this.errorHandler.wrapAsync(async () => {
             const category = this.determineCategory(sampleAnalysis);
-            const categoryPath = path.join(this.syncHubPath, category);
-            const folderPath = path.join(categoryPath, folderName);
+            const sanitizedFolderName = this.sanitizeFolderName(folderName);
+            // Ensure syncHubPath is absolute
+            const absoluteSyncHubPath = path.isAbsolute(this.syncHubPath) 
+                ? this.syncHubPath 
+                : path.resolve(this.syncHubPath);
+            const categoryPath = path.join(absoluteSyncHubPath, category);
+            const folderPath = path.join(categoryPath, sanitizedFolderName);
+
+            if (this.dryRun) {
+                await this.errorHandler.logInfo('DRY RUN: Would create consolidated folder structure', {
+                    folderName: sanitizedFolderName,
+                    category,
+                    folderPath,
+                    subfolders: ['assets', 'references']
+                });
+                return folderPath;
+            }
 
             await this.errorHandler.logDebug('Creating consolidated folder structure', {
-                folderName,
+                folderName: sanitizedFolderName,
                 category,
                 folderPath
             });
@@ -538,6 +556,14 @@ Please return only the enhanced content in markdown format, without any explanat
         const fullContent = metadata + content;
 
         const docPath = path.join(targetFolder, 'main.md');
+        
+        if (this.dryRun) {
+            console.log(`[DRY RUN] Would create consolidated document: ${docPath}`);
+            console.log(`[DRY RUN] Document would contain ${fullContent.length} characters`);
+            console.log(`[DRY RUN] Document would include ${consolidationCandidate.files.length} source files`);
+            return docPath;
+        }
+
         await fs.writeFile(docPath, fullContent, 'utf-8');
 
         console.log(`[INFO] Created consolidated document: ${docPath}`);
@@ -552,6 +578,25 @@ Please return only the enhanced content in markdown format, without any explanat
             const referencesFolder = path.join(targetFolder, 'references');
             const movedFiles = [];
             const failedFiles = [];
+
+            if (this.dryRun) {
+                await this.errorHandler.logInfo('DRY RUN: Would move reference materials', {
+                    fileCount: files.length,
+                    referencesFolder,
+                    files: files.map(f => path.basename(f.filePath))
+                });
+                
+                // Simulate successful moves for dry run
+                for (const file of files) {
+                    const fileName = path.basename(file.filePath);
+                    movedFiles.push(fileName);
+                }
+                
+                return {
+                    movedFiles,
+                    failedFiles: []
+                };
+            }
 
             await this.errorHandler.logDebug('Moving reference materials', {
                 fileCount: files.length,

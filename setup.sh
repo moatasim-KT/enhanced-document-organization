@@ -70,9 +70,10 @@ echo "🔧 Setting up Unison profiles..."
 UNISON_DIR="$HOME/.unison"
 mkdir -p "$UNISON_DIR"
 
-# Copy profiles
-cp "$SCRIPT_DIR/config/unison_icloud.prf" "$UNISON_DIR/icloud.prf"
-cp "$SCRIPT_DIR/config/unison_google_drive.prf" "$UNISON_DIR/google_drive.prf"
+# Copy and expand profiles
+sed "s|\$SYNC_HUB|$SYNC_HUB|g" "$SCRIPT_DIR/config/unison_icloud.prf" > "$UNISON_DIR/icloud.prf"
+sed "s|\$SYNC_HUB|$SYNC_HUB|g" "$SCRIPT_DIR/config/unison_google_drive.prf" > "$UNISON_DIR/google_drive.prf"
+
 echo "   Copied Unison profiles to ~/.unison/"
 
 echo ""

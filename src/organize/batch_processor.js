@@ -330,10 +330,17 @@ class BatchProcessor {
                 projectRoot: this.projectRoot,
                 syncHubPath: options.syncHubPath,
                 aiService: options.aiService || 'none',
-                enhanceContent: options.enhanceContent || false
+                enhanceContent: options.enhanceContent || false,
+                dryRun: options.dryRun || false
             });
 
-            console.log(`[BatchProcessor] Consolidating content for topic: ${consolidationCandidate.topic}`);
+            const isDryRun = options.dryRun || false;
+            if (isDryRun) {
+                console.log(`[BatchProcessor] DRY RUN: Analyzing consolidation for topic: ${consolidationCandidate.topic}`);
+            } else {
+                console.log(`[BatchProcessor] Consolidating content for topic: ${consolidationCandidate.topic}`);
+            }
+            
             const result = await consolidator.consolidateDocuments(consolidationCandidate);
 
             return result;

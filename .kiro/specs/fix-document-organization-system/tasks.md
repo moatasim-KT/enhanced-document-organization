@@ -42,7 +42,7 @@
   - Add proper usage information for invalid arguments
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-- [ ] 8. Implement reliable dry-run functionality
+- [x] 8. Implement reliable dry-run functionality
   - Ensure dry-run mode prevents all file modifications and only logs intended actions
   - Update all file operation functions to respect the dry-run flag
   - Add clear indicators in log output when running in dry-run mode
@@ -84,9 +84,9 @@
   - Ensure the system fails fast with helpful error messages when critical components are missing
   - _Requirements: 6.4, 7.3, 7.4_
 
-- [ ] 15. Create comprehensive test suite
+- [x] 15. Create comprehensive test suite
   - Write unit tests for ContentConsolidator path management fixes
   - Create integration tests for the complete organization workflow
-  - Implement MCP server tool testing to verify all 14 tools work correctly
+  - Implement MCP server tool testing to verify all tools work correctly
   - Add dry-run functionality tests to ensure no files are modified in preview mode
   - _Requirements: All requirements validation_

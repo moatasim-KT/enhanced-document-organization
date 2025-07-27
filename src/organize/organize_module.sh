@@ -304,18 +304,30 @@ organize_documents() {
     
     # Step 2: Handle duplicates
     if [[ "$ENABLE_DUPLICATE_DETECTION" == "true" && -f "$duplicates_found" ]]; then
-        log "INFO" "Processing duplicates..."
+        if [[ "$dry_run" == "true" ]]; then
+            log "INFO" "DRY RUN: Analyzing duplicates (no files will be deleted)..."
+        else
+            log "INFO" "Processing duplicates..."
+        fi
         process_duplicates "$duplicates_found" "$dry_run"
     fi
     
     # Step 3: Handle content consolidation
     if [[ "$ENABLE_CONTENT_CONSOLIDATION" == "true" && -f "$consolidation_candidates" ]]; then
-        log "INFO" "Processing consolidation candidates..."
+        if [[ "$dry_run" == "true" ]]; then
+            log "INFO" "DRY RUN: Analyzing consolidation candidates (no files will be created)..."
+        else
+            log "INFO" "Processing consolidation candidates..."
+        fi
         process_consolidation_candidates "$consolidation_candidates" "$dry_run"
     fi
     
     # Step 4: Organize remaining files
-    log "INFO" "Organizing remaining files..."
+    if [[ "$dry_run" == "true" ]]; then
+        log "INFO" "DRY RUN: Analyzing file organization (no files will be moved)..."
+    else
+        log "INFO" "Organizing remaining files..."
+    fi
     organize_remaining_files "$source_dir" "$dry_run"
     
     # Step 5: Check for category suggestions
@@ -516,7 +528,11 @@ process_duplicates() {
         fi
     done
 
-    log "INFO" "Processed $processed_count duplicate files, deleted $deleted_count files"
+    if [[ "$dry_run" == "true" ]]; then
+        log "INFO" "DRY RUN: Processed $processed_count duplicate files, would have deleted $deleted_count files"
+    else
+        log "INFO" "Processed $processed_count duplicate files, deleted $deleted_count files"
+    fi
 }
 
 # Process content consolidation candidates with improved error handling
@@ -559,24 +575,33 @@ process_consolidation_candidates() {
                     // Handle both array and object formats
                     const candidateEntries = Array.isArray(candidates) ? candidates : Object.entries(candidates);
                     
+                    let totalFiles = 0;
+                    let totalGroups = 0;
+                    
                     for (const [topic, candidate] of candidateEntries) {
                         if (candidate && candidate.files) {
-                            console.log(\`Topic: \${topic} (\${candidate.files.length} files, similarity: \${(candidate.avgSimilarity || 0).toFixed(2)})\`);
-                            console.log(\`  Title: \${candidate.recommendedTitle || 'N/A'}\`);
-                            console.log(\`  Strategy: \${candidate.consolidationStrategy || 'simple_merge'}\`);
-                            console.log(\`  Files: \${candidate.files.map(f => f.filePath || f).join(', ')}\`);
+                            totalGroups++;
+                            totalFiles += candidate.files.length;
+                            console.log(\`[DRY RUN] Topic: \${topic} (\${candidate.files.length} files, similarity: \${(candidate.avgSimilarity || 0).toFixed(2)})\`);
+                            console.log(\`[DRY RUN]   Title: \${candidate.recommendedTitle || 'N/A'}\`);
+                            console.log(\`[DRY RUN]   Strategy: \${candidate.consolidationStrategy || 'simple_merge'}\`);
+                            console.log(\`[DRY RUN]   Files: \${candidate.files.map(f => f.filePath || f).join(', ')}\`);
+                            console.log(\`[DRY RUN]   Would create: Sync_Hub_New/[category]/\${candidate.recommendedTitle || topic}/main.md\`);
                             console.log('');
                         }
                     }
+                    
+                    console.log(\`[DRY RUN] Summary: Would consolidate \${totalFiles} files into \${totalGroups} consolidated documents\`);
                 } catch (error) {
-                    console.error('Failed to process consolidation candidates:', error.message);
+                    console.error('[DRY RUN] Failed to process consolidation candidates:', error.message);
                 }
             " 2>/dev/null || log "WARN" "Failed to display consolidation preview"
         else
             # Actually perform consolidation using batch processor
             log "INFO" "Performing content consolidation..."
             
-            node -e "
+            # Pass dry_run flag to the Node.js consolidation process
+            DRY_RUN="$dry_run" node -e "
                 import BatchProcessor from '$PROJECT_DIR/organize/batch_processor.js';
                 import { promises as fs } from 'fs';
                 
@@ -588,6 +613,7 @@ process_consolidation_candidates() {
                         
                         const candidates = JSON.parse(await fs.readFile('$candidates_file', 'utf8'));
                         const candidateEntries = Array.isArray(candidates) ? candidates : Object.entries(candidates);
+                        const isDryRun = process.env.DRY_RUN === 'true';
                         
                         for (const [topic, candidate] of candidateEntries) {
                             if (candidate && candidate.files && candidate.files.length >= $MIN_CONSOLIDATION_FILES) {
@@ -596,9 +622,14 @@ process_consolidation_candidates() {
                                     const result = await processor.consolidateContent(candidate, {
                                         syncHubPath: '$SYNC_HUB',
                                         aiService: '$ENABLE_AI_ENHANCEMENT' === 'true' ? 'local' : 'none',
-                                        enhanceContent: '$ENABLE_AI_ENHANCEMENT' === 'true'
+                                        enhanceContent: '$ENABLE_AI_ENHANCEMENT' === 'true',
+                                        dryRun: isDryRun
                                     });
-                                    console.log(\`Created: \${result.consolidatedDocument}\`);
+                                    if (isDryRun) {
+                                        console.log(\`[DRY RUN] Would create: \${result.consolidatedDocument}\`);
+                                    } else {
+                                        console.log(\`Created: \${result.consolidatedDocument}\`);
+                                    }
                                 } catch (error) {
                                     console.error(\`Failed to consolidate \${topic}: \${error.message}\`);
                                 }
@@ -675,7 +706,11 @@ organize_remaining_files() {
         
     done < <(find "$source_dir" -maxdepth 2 -type f \( -path "*/Inbox/*" -o -path "$source_dir/*" \) -print0)
     
-    log "INFO" "Processed $processed_count files, moved $moved_count files"
+    if [[ "$dry_run" == "true" ]]; then
+        log "INFO" "DRY RUN: Processed $processed_count files, would have moved $moved_count files"
+    else
+        log "INFO" "Processed $processed_count files, moved $moved_count files"
+    fi
 }
 
 # Enhanced category detection using the batch processor
@@ -991,6 +1026,7 @@ main() {
     # Ensure dry-run mode is properly indicated in logs
     if [[ "$dry_run" == "true" ]]; then
         log "INFO" "=== DRY RUN MODE ACTIVE - NO FILES WILL BE MODIFIED ==="
+        log "INFO" "All file operations will be simulated and logged only"
     fi
     
     organize_documents "$source_dir" "$dry_run"

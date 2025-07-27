@@ -67,6 +67,18 @@ class TestRunner {
         // Define test suites
         const testSuites = [
             {
+                file: 'simple_comprehensive_test.js',
+                description: 'Simple Comprehensive Test Suite (Core Functionality)'
+            },
+            {
+                file: 'organize/test_content_consolidator_paths.js',
+                description: 'ContentConsolidator Path Management Tests'
+            },
+            {
+                file: 'organize/test_dry_run_functionality.js',
+                description: 'Dry-Run Functionality Tests'
+            },
+            {
                 file: 'organize/test_system_validation.js',
                 description: 'System Validation Tests'
             },
@@ -83,8 +95,12 @@ class TestRunner {
                 description: 'Module Import Resolution Tests'
             },
             {
+                file: 'comprehensive_test_suite.js',
+                description: 'Full Comprehensive Test Suite (Advanced)'
+            },
+            {
                 file: 'mcp/test_mcp_tools.js',
-                description: 'MCP Tools Tests'
+                description: 'Enhanced MCP Tools Tests'
             },
             {
                 file: 'mcp/test_error_handling.js',

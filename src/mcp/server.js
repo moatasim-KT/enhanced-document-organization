@@ -80,30 +80,8 @@ export class DocumentOrganizationServer {
    * Detect project root by looking for config directory
    */
   detectProjectRoot() {
-    // Start from current working directory and look for config directory
-    let currentDir = process.cwd();
-    const maxDepth = 5; // Prevent infinite loops
-
-    for (let i = 0; i < maxDepth; i++) {
-      const configPath = path.join(currentDir, 'config', 'config.env');
-      try {
-        // Check if config.env exists using existsSync instead of accessSync
-        if (require('fs').existsSync(configPath)) {
-          return currentDir;
-        }
-        throw new Error('Config file not found');
-      } catch (error) {
-        // Move up one directory
-        const parentDir = path.dirname(currentDir);
-        if (parentDir === currentDir) {
-          // Reached filesystem root
-          break;
-        }
-        currentDir = parentDir;
-      }
-    }
-
-    // Fallback to current working directory
+    // Return current working directory as project root
+    // The actual config validation will be done asynchronously in initializePaths()
     return process.cwd();
   }
 
@@ -567,7 +545,8 @@ export class DocumentOrganizationServer {
               topic: { type: 'string', description: 'Topic to consolidate' },
               file_paths: { type: 'array', items: { type: 'string' }, description: 'Files to consolidate' },
               strategy: { type: 'string', description: 'Consolidation strategy', enum: ['simple_merge', 'structured_consolidation', 'comprehensive_merge'], default: 'comprehensive_merge' },
-              enhance_with_ai: { type: 'boolean', description: 'Use AI to enhance content', default: false }
+              enhance_with_ai: { type: 'boolean', description: 'Use AI to enhance content', default: false },
+              dry_run: { type: 'boolean', description: 'Preview changes without applying them', default: false }
             },
             required: ['topic', 'file_paths']
           }
@@ -1409,7 +1388,7 @@ export class DocumentOrganizationServer {
 
   async consolidateContent(args) {
     try {
-      const { topic, file_paths, strategy = 'comprehensive_merge', enhance_with_ai = false } = args;
+      const { topic, file_paths, strategy = 'comprehensive_merge', enhance_with_ai = false, dry_run = false } = args;
 
       // Use BatchProcessor if available, otherwise fallback to direct imports
       if (this.modules.BatchProcessor) {
@@ -1436,7 +1415,8 @@ export class DocumentOrganizationServer {
 
         const result = await processor.consolidateContent(consolidationCandidate, {
           syncHubPath: this.syncHub,
-          enhanceContent: enhance_with_ai
+          enhanceContent: enhance_with_ai,
+          dryRun: dry_run
         });
 
         return {
@@ -1449,7 +1429,8 @@ export class DocumentOrganizationServer {
                   target_folder: result.targetFolder,
                   consolidated_document: result.consolidatedDocument,
                   original_files: file_paths,
-                  strategy_used: result.consolidationStrategy
+                  strategy_used: result.consolidationStrategy,
+                  dry_run: dry_run
                 },
                 topic,
                 files_consolidated: file_paths.length,
@@ -1531,7 +1512,8 @@ export class DocumentOrganizationServer {
         projectRoot: this.projectRoot,
         syncHubPath: this.syncHub, // Use configured sync hub path
         enhanceContent: enhance_with_ai,
-        aiService: enhance_with_ai ? 'local' : 'none'
+        aiService: enhance_with_ai ? 'local' : 'none',
+        dryRun: dry_run
       });
 
       // Create consolidation candidate object with real analysis
@@ -1554,7 +1536,8 @@ export class DocumentOrganizationServer {
                 target_folder: result.targetFolder,
                 consolidated_document: result.consolidatedDocument,
                 original_files: file_paths, // Use original relative paths
-                strategy_used: result.consolidationStrategy
+                strategy_used: result.consolidationStrategy,
+                dry_run: dry_run
               },
               topic,
               files_consolidated: analyzedFiles.length,

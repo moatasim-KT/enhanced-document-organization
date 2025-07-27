@@ -2,7 +2,7 @@
 # Syncs between local sync hub and iCloud (Obsidian documents)
 
 # Sync directories
-root = /Users/moatasimfarooque/Sync_Hub_New
+root = $SYNC_HUB
 root = /Users/moatasimfarooque/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync
 
 # Basic sync options
