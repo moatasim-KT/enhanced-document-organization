@@ -10,8 +10,8 @@ import path from 'path';
 
 export class CategoryManager {
     constructor(options = {}) {
-        this.configPath = options.configPath || path.join(this.projectRoot, 'config', 'organize_config.conf');
         this.projectRoot = options.projectRoot;
+        this.configPath = options.configPath || (this.projectRoot ? path.join(this.projectRoot, 'config', 'organize_config.conf') : 'config/organize_config.conf');
         this.categories = new Map();
         this.customCategories = new Map();
         this.categoryStats = new Map();
@@ -24,6 +24,7 @@ export class CategoryManager {
     async initialize() {
         if (this.initialized) return;
 
+        // Only load categories into memory, do not create or add any categories on initialization
         await this.loadDefaultCategories();
         await this.loadCustomCategories();
         await this.updateCategoryStats();
@@ -166,7 +167,7 @@ export class CategoryManager {
         const category = {
             id: this.generateCategoryId(categoryData.name),
             name: categoryData.name,
-            icon: categoryData.icon || '📁',
+            icon: categoryData.icon || '',
             description: categoryData.description || '',
             keywords: categoryData.keywords || [],
             filePatterns: categoryData.filePatterns || [],
@@ -282,7 +283,7 @@ export class CategoryManager {
     generateCategoryName(topics) {
         const mainTopic = topics[0];
         const formattedTopic = mainTopic.charAt(0).toUpperCase() + mainTopic.slice(1);
-        return `📂 ${formattedTopic}`;
+        return formattedTopic;
     }
 
     /**

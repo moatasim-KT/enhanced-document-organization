@@ -17,9 +17,10 @@ import {
 import { promises as fs } from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
+import os from 'os';
 import { ContentConsolidator } from '../organize/content_consolidator.js';
 
-class DocumentOrganizationServer {
+export class DocumentOrganizationServer {
   constructor() {
     this.server = new Server(
       {
@@ -27,18 +28,52 @@ class DocumentOrganizationServer {
         version: '1.0.0',
       },
       {
-        capabilities: {
-          resources: {},
-          tools: {},
-        },
+        capabilities: {},
       }
     );
 
     this.projectRoot = '/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync';
-    this.syncHub = '/Users/moatasimfarooque/Sync_Hub_New';
+    this.syncHub = path.join(os.homedir(), 'Sync_Hub_New'); // Default fallback
+    this.logFilePath = path.join(this.projectRoot, 'logs', 'mcp_server.log');
 
-    this.setupToolHandlers();
-    this.setupResourceHandlers();
+    // Bind logError to the instance
+    this.logError = this.logError.bind(this);
+
+    // Ensure logs directory exist
+    fs.mkdir(path.dirname(this.logFilePath), { recursive: true }).catch(() => { });
+
+    // Initialize paths asynchronously
+    this.initializePaths().then(() => {
+      this.setupToolHandlers();
+      this.setupResourceHandlers();
+    }).catch(error => {
+      this.logError(`Error during server initialization: ${error.message}`);
+    });
+  }
+
+  async initializePaths() {
+    const configEnvPath = path.join(this.projectRoot, 'config', 'config.env');
+    try {
+      const configEnvContent = await fs.readFile(configEnvPath, 'utf8');
+      const syncHubMatch = configEnvContent.match(/^SYNC_HUB="(.*?)"$/m);
+      if (syncHubMatch && syncHubMatch[1]) {
+        this.syncHub = syncHubMatch[1].replace('${HOME}', os.homedir());
+      }
+    } catch (error) {
+      console.warn(`[WARN] Could not read config.env: ${error.message}. Using fallback for SYNC_HUB.`);
+    }
+    // Ensure Sync_Hub_New exists after path initialization
+    await fs.mkdir(this.syncHub, { recursive: true }).catch(() => { });
+  }
+
+  async logError(message) {
+    const timestamp = new Date().toISOString();
+    const logMessage = `[${timestamp}] [ERROR] ${message}\n`;
+    try {
+      await fs.appendFile(this.logFilePath, logMessage);
+    } catch (err) {
+      console.error(`Failed to write to log file: ${this.logFilePath}`, err);
+    }
   }
 
   setupToolHandlers() {
@@ -239,6 +274,14 @@ class DocumentOrganizationServer {
             return await this.addCustomCategory(args);
           case 'enhance_content':
             return await this.enhanceContent(args);
+          case 'delete_document':
+            return await this.deleteDocument(args);
+          case 'rename_document':
+            return await this.renameDocument(args);
+          case 'move_document':
+            return await this.moveDocument(args);
+          case 'list_files_in_category':
+            return await this.listFilesInCategory(args);
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
@@ -273,16 +316,18 @@ class DocumentOrganizationServer {
   }
 
   async searchDocuments(args) {
-    const { query, category, limit = 10 } = args;
+    const { query, category, limit = 10, use_regex = false } = args;
 
     try {
-      // Use grep to search for content
       let searchPath = this.syncHub;
       if (category) {
         searchPath = path.join(this.syncHub, category);
       }
 
-      const grepCommand = `find "${searchPath}" -type f -name "*.md" -o -name "*.txt" -o -name "*.doc*" | head -${limit} | xargs grep -l -i "${query}" 2>/dev/null || true`;
+      const escapedQuery = query.replace(/'/g, "'\\''");
+      const grepOptions = use_regex ? '-l -i -E' : '-l -i';
+
+      const grepCommand = `find "${searchPath}" -type f -name "*.md" -o -name "*.txt" -o -name "*.doc*" | xargs grep ${grepOptions} '${escapedQuery}' 2>/dev/null || true`;
       const results = execSync(grepCommand, { encoding: 'utf8' }).trim();
 
       const files = results ? results.split('\n').filter(Boolean) : [];
@@ -304,7 +349,7 @@ class DocumentOrganizationServer {
             preview
           });
         } catch (error) {
-          console.error(`Error processing file ${file}:`, error);
+          this.logError(`Error processing file ${file}: ${error.message}`);
         }
       }
 
@@ -354,24 +399,11 @@ class DocumentOrganizationServer {
 
   async createDocument(args) {
     const { title, content, category } = args;
-
     try {
-      // Determine category if not provided
       let targetCategory = category;
+      // If category is not provided, default to 'Notes & Drafts'
       if (!targetCategory) {
-        // Simple category detection based on content
-        const contentLower = `${title} ${content}`.toLowerCase();
-        if (contentLower.includes('ai') || contentLower.includes('machine learning') || contentLower.includes('neural')) {
-          targetCategory = '🤖 AI & ML';
-        } else if (contentLower.includes('research') || contentLower.includes('paper') || contentLower.includes('study')) {
-          targetCategory = '📚 Research Papers';
-        } else if (contentLower.includes('code') || contentLower.includes('programming') || contentLower.includes('api')) {
-          targetCategory = '💻 Development';
-        } else if (contentLower.includes('article') || contentLower.includes('tutorial') || contentLower.includes('guide')) {
-          targetCategory = '🌐 Web Content';
-        } else {
-          targetCategory = '📝 Notes & Drafts';
-        }
+        targetCategory = 'Notes & Drafts';
       }
 
       // Create category directory if it doesn't exist
@@ -455,28 +487,23 @@ class DocumentOrganizationServer {
 
   async getOrganizationStats() {
     try {
-      const categories = ['🤖 AI & ML', '📚 Research Papers', '🌐 Web Content', '📝 Notes & Drafts', '💻 Development'];
-      const stats = {};
+      const { CategoryManager } = await import('../organize/category_manager.js');
+      const manager = new CategoryManager({ projectRoot: this.projectRoot });
+      await manager.initialize();
 
-      for (const category of categories) {
-        const categoryPath = path.join(this.syncHub, category);
-        try {
-          const files = await fs.readdir(categoryPath);
-          stats[category] = files.filter(f => !f.startsWith('.')).length;
-        } catch (error) {
-          stats[category] = 0;
-        }
-      }
+      const categoryStats = manager.getCategoryStats();
+      const stats = {};
+      categoryStats.forEach(stat => {
+        stats[stat.name] = stat.fileCount || 0;
+      });
 
       // Count uncategorized files
       try {
-        const allFiles = await fs.readdir(this.syncHub);
-        const uncategorized = allFiles.filter(f =>
-          !f.startsWith('.') &&
-          !categories.includes(f) &&
-          (f.endsWith('.md') || f.endsWith('.txt') || f.endsWith('.doc') || f.endsWith('.docx'))
-        );
-        stats['Uncategorized'] = uncategorized.length;
+        const allEntries = await fs.readdir(this.syncHub, { withFileTypes: true });
+        const uncategorizedFiles = allEntries.filter(entry =>
+          entry.isFile() && !entry.name.startsWith('.')
+        ).length;
+        stats['Uncategorized'] = uncategorizedFiles;
       } catch (error) {
         stats['Uncategorized'] = 0;
       }
@@ -486,7 +513,7 @@ class DocumentOrganizationServer {
           {
             type: 'text',
             text: JSON.stringify({
-              sync_hub: '/Users/moatasimfarooque/Sync_Hub_New',
+              sync_hub: this.syncHub,
               categories: stats,
               total_files: Object.values(stats).reduce((a, b) => a + b, 0),
               last_updated: new Date().toISOString()
@@ -501,29 +528,23 @@ class DocumentOrganizationServer {
 
   async listCategories() {
     try {
-      const categories = ['🤖 AI & ML', '📚 Research Papers', '🌐 Web Content', '📝 Notes & Drafts', '💻 Development'];
-      const categoryInfo = [];
+      const { CategoryManager } = await import('../organize/category_manager.js');
+      const manager = new CategoryManager({ projectRoot: this.projectRoot });
+      await manager.initialize();
 
-      for (const category of categories) {
-        const categoryPath = path.join(this.syncHub, category);
-        try {
-          const files = await fs.readdir(categoryPath);
-          const fileCount = files.filter(f => !f.startsWith('.')).length;
-          categoryInfo.push({
-            name: category,
-            path: category,
-            file_count: fileCount,
-            exists: true
-          });
-        } catch (error) {
-          categoryInfo.push({
-            name: category,
-            path: category,
-            file_count: 0,
-            exists: false
-          });
-        }
-      }
+      const allCategories = manager.getAllCategories();
+      const categoryStats = manager.getCategoryStats();
+      const statsMap = new Map(categoryStats.map(s => [s.name, s]));
+
+      const categoryInfo = allCategories.map(category => {
+        const stats = statsMap.get(category.name);
+        return {
+          name: category.name,
+          description: category.description,
+          file_count: stats ? stats.fileCount : 0,
+          exists: !!stats
+        };
+      });
 
       return {
         content: [
@@ -559,7 +580,8 @@ class DocumentOrganizationServer {
         ]
       };
     } catch (error) {
-      throw new Error(`Failed to get system status: ${error.message}`);
+      console.error(`Error executing drive_sync.sh status: ${command}\nStderr: ${error.stderr}`);
+      throw new Error(`Failed to get system status: ${error.message}. See server logs for details.`);
     }
   }
 
@@ -576,7 +598,7 @@ class DocumentOrganizationServer {
       const results = new Map();
 
       for (const filePath of file_paths) {
-        const fullPath = path.resolve(filePath);
+        const fullPath = path.join(this.syncHub, filePath);
         const analysis = await analyzer.analyzeContent(fullPath);
         if (analysis) {
           results.set(filePath, analysis);
@@ -605,13 +627,15 @@ class DocumentOrganizationServer {
     try {
       const { directory, similarity_threshold = 0.8 } = args;
 
+      const fullDirectoryPath = path.join(this.syncHub, directory);
+
       // Get all files in directory
       const files = [];
-      const entries = await fs.readdir(directory, { withFileTypes: true });
+      const entries = await fs.readdir(fullDirectoryPath, { withFileTypes: true });
 
       for (const entry of entries) {
         if (entry.isFile() && !entry.name.startsWith('.')) {
-          files.push(path.join(directory, entry.name));
+          files.push(path.join(fullDirectoryPath, entry.name));
         }
       }
 
@@ -652,19 +676,29 @@ class DocumentOrganizationServer {
     try {
       const { topic, file_paths, strategy = 'comprehensive_merge', enhance_with_ai = false } = args;
 
+      // Analyze each file before consolidation
+      const { ContentAnalyzer } = await import('../organize/content_analyzer.js');
+      const analyzer = new ContentAnalyzer();
+      const analyzedFiles = [];
+      for (const filePath of file_paths) {
+        const fullPath = path.join(this.syncHub, filePath);
+        const analysis = await analyzer.analyzeContent(fullPath);
+        analyzedFiles.push({
+          filePath,
+          analysis: analysis || { metadata: { suggestedTitle: path.basename(filePath, path.extname(filePath)) } }
+        });
+      }
+
       const consolidator = new ContentConsolidator({
         projectRoot: this.projectRoot,
         enhanceContent: enhance_with_ai,
         aiService: enhance_with_ai ? 'local' : 'none'
       });
 
-      // Create consolidation candidate object
+      // Create consolidation candidate object with real analysis
       const consolidationCandidate = {
         topic,
-        files: file_paths.map(filePath => ({
-          filePath,
-          analysis: { metadata: { suggestedTitle: path.basename(filePath, path.extname(filePath)) } }
-        })),
+        files: analyzedFiles,
         recommendedTitle: `${topic} - Consolidated`,
         consolidationStrategy: strategy
       };
@@ -702,7 +736,7 @@ class DocumentOrganizationServer {
       // Import CategoryManager
       const { CategoryManager } = await import('../organize/category_manager.js');
       const manager = new CategoryManager({
-        configPath: path.join(this.projectRoot, 'organize_config.conf'),
+        configPath: path.join(this.projectRoot, 'config', 'organize_config.conf'),
         projectRoot: this.projectRoot
       });
       await manager.initialize();
@@ -759,7 +793,7 @@ class DocumentOrganizationServer {
       // Import CategoryManager
       const { CategoryManager } = await import('../organize/category_manager.js');
       const manager = new CategoryManager({
-        configPath: path.join(this.projectRoot, 'organize_config.conf'),
+        configPath: path.join(this.projectRoot, 'config', 'organize_config.conf'),
         projectRoot: this.projectRoot
       });
       await manager.initialize();
@@ -826,18 +860,112 @@ class DocumentOrganizationServer {
     }
   }
 
+  async deleteDocument(args) {
+    const { file_path } = args;
+    try {
+      const fullPath = path.join(this.syncHub, file_path);
+      await fs.unlink(fullPath);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              message: `Document ${file_path} deleted successfully.`
+            }, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Failed to delete document ${file_path}: ${error.message}`);
+    }
+  }
+
+  async renameDocument(args) {
+    const { old_file_path, new_file_name } = args;
+    try {
+      const oldFullPath = path.join(this.syncHub, old_file_path);
+      const newFullPath = path.join(path.dirname(oldFullPath), new_file_name);
+      await fs.rename(oldFullPath, newFullPath);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              old_path: old_file_path,
+              new_path: path.relative(this.syncHub, newFullPath),
+              message: `Document ${old_file_path} renamed to ${new_file_name} successfully.`
+            }, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Failed to rename document ${old_file_path} to ${new_file_name}: ${error.message}`);
+    }
+  }
+
+  async moveDocument(args) {
+    const { file_path, new_category } = args;
+    try {
+      const oldFullPath = path.join(this.syncHub, file_path);
+      const newCategoryPath = path.join(this.syncHub, new_category);
+      await fs.mkdir(newCategoryPath, { recursive: true }); // Ensure target category exists
+      const newFullPath = path.join(newCategoryPath, path.basename(file_path));
+      await fs.rename(oldFullPath, newFullPath);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              success: true,
+              old_path: file_path,
+              new_path: path.relative(this.syncHub, newFullPath),
+              message: `Document ${file_path} moved to ${new_category} successfully.`
+            }, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Failed to move document ${file_path} to ${new_category}: ${error.message}`);
+    }
+  }
+
+  async listFilesInCategory(args) {
+    const { category } = args;
+    try {
+      const categoryPath = path.join(this.syncHub, category);
+      const files = await fs.readdir(categoryPath, { withFileTypes: true });
+      const fileList = files
+        .filter(dirent => dirent.isFile() && !dirent.name.startsWith('.'))
+        .map(dirent => ({
+          name: dirent.name,
+          path: path.join(category, dirent.name)
+        }));
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              category,
+              file_count: fileList.length,
+              files: fileList
+            }, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Failed to list files in category ${category}: ${error.message}`);
+    }
+  }
+
   async run() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error('Enhanced Document Organization MCP Server running on stdio');
+    this.logError('Enhanced Document Organization MCP Server running on stdio');
   }
 }
 
-const server = new DocumentOrganizationServer();
-server.addCustomCategory({
-  name: '📂 Https',
-  icon: '📂',
-  description: 'Auto-suggested category for https, with, this, learning, code content',
-  keywords: ['https', 'with', 'this', 'learning', 'code']
-}).then(() => console.log('Category added directly.')).catch(console.error);
-server.run().catch(console.error);
+const docOrgServer = new DocumentOrganizationServer();
+
+docOrgServer.run().catch(err => docOrgServer.logError(`Server startup error: ${err.message}`));

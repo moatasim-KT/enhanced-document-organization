@@ -8,12 +8,41 @@
 
 set -euo pipefail
 
+export PATH="/opt/homebrew/opt/util-linux/bin:$PATH"
+
 # Get script directory and parent
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-# Load configuration
-source "$(dirname "$PROJECT_DIR")/config/config.env"
+
+# Load configuration with defaults
+CONFIG_FILE="$PROJECT_DIR/../config/config.env"
+if [[ -f "$CONFIG_FILE" ]]; then
+    source "$CONFIG_FILE"
+else
+    echo "[ERROR] Config file not found: $CONFIG_FILE" >&2
+    exit 1
+fi
+
+# Set config defaults if not set
+: "${LOG_TO_CONSOLE:=true}"
+: "${LOG_TO_FILE:=true}"
+: "${SYNC_ENABLED:=true}"
+: "${SYNC_HUB:?SYNC_HUB not set in config.env}"
+: "${ICLOUD_PATH:?ICLOUD_PATH not set in config.env}"
+: "${GOOGLE_DRIVE_PATH:?GOOGLE_DRIVE_PATH not set in config.env}"
+
+# Log rotation (keep last 5 logs, 1MB max)
+rotate_log() {
+    local logfile="$1"
+    if [[ -f "$logfile" && $(wc -c < "$logfile" | awk '{print $1}') -ge 1048576 ]]; then
+        for i in 5 4 3 2 1; do
+            [[ -f "$logfile.$i" ]] && mv "$logfile.$i" "$logfile.$((i+1))"
+        done
+        mv "$logfile" "$logfile.1"
+        touch "$logfile"
+    fi
+}
 
 # Logging function
 log() {
@@ -28,7 +57,9 @@ log() {
     
     if [[ "$LOG_TO_FILE" == "true" ]]; then
         mkdir -p "$PROJECT_DIR/logs"
-        echo "[$timestamp] [$level] $message" >> "$PROJECT_DIR/logs/sync.log"
+        local logfile="$PROJECT_DIR/logs/sync.log"
+        rotate_log "$logfile"
+        echo "[$timestamp] [$level] $message" >> "$logfile"
     fi
 }
 
@@ -50,120 +81,105 @@ check_unison() {
     return 0
 }
 
-# Sync using Unison profile
+# Sync using Unison profile (with dry-run and safe temp file)
 sync_with_unison() {
     local profile="$1"
-    local profile_path="$(dirname "$PROJECT_DIR")/config/$profile.prf"
-    
+    local dry_run_flag="${2:-false}"
+    local profile_path="$PROJECT_DIR/../config/$profile.prf"
     if [[ ! -f "$profile_path" ]]; then
         log "ERROR" "Profile not found: $profile_path"
         return 1
     fi
-    
-    log "INFO" "Starting sync with profile: $profile"
-    
-    # Copy profile to Unison directory
+    log "INFO" "Starting sync with profile: $profile${dry_run_flag:+ (dry-run)}"
     local unison_dir="$HOME/.unison"
     ensure_directory "$unison_dir"
-    cp "$profile_path" "$unison_dir/${profile#unison_}.prf"
-    
-    # Run Unison sync
+    # Only copy if source is newer
+    local dest_profile="$unison_dir/${profile#unison_}.prf"
+    if [[ ! -f "$dest_profile" || "$profile_path" -nt "$dest_profile" ]]; then
+        cp "$profile_path" "$dest_profile"
+    fi
+    # Use unique temp file
+    local tmpfile="/tmp/unison_output_$$.log"
     local profile_name="${profile#unison_}"
-    if unison "$profile_name" -batch -auto -silent 2>/dev/null; then
+    local unison_args=("$profile_name" -batch -auto)
+    [[ "$dry_run_flag" == "true" ]] && unison_args+=( -testserver )
+    if unison "${unison_args[@]}" &> "$tmpfile"; then
         log "INFO" "Sync completed successfully: $profile"
+        rm -f "$tmpfile"
         return 0
     else
-        log "ERROR" "Sync failed: $profile"
+        local unison_error=$(cat "$tmpfile")
+        log "ERROR" "Sync failed: $profile. Error: $unison_error"
+        rm -f "$tmpfile"
         return 1
     fi
 }
 
-# Sync iCloud
-sync_icloud() {
-    log "INFO" "Starting iCloud sync"
-    
-    # Ensure directories exist
+# Generic sync service (dynamic, extensible)
+sync_service() {
+    local service="$1"
+    local path_var="$2"
+    local profile="$3"
+    local dry_run_flag="${4:-false}"
+    local path_value="${!path_var}"
+    log "INFO" "Starting $service sync"
     ensure_directory "$SYNC_HUB"
-    ensure_directory "$(dirname "$ICLOUD_PATH")"
-    
-    if sync_with_unison "unison_icloud"; then
-        log "INFO" "iCloud sync completed successfully"
+    ensure_directory "$path_value"
+    if sync_with_unison "$profile" "$dry_run_flag"; then
+        log "INFO" "$service sync completed successfully"
         return 0
     else
-        log "ERROR" "iCloud sync failed"
+        log "ERROR" "$service sync failed"
         return 1
     fi
 }
 
-# Sync Google Drive
-sync_google_drive() {
-    log "INFO" "Starting Google Drive sync"
-    
-    # Ensure directories exist
-    ensure_directory "$SYNC_HUB"
-    ensure_directory "$(dirname "$GOOGLE_DRIVE_PATH")"
-    
-    if sync_with_unison "unison_google_drive"; then
-        log "INFO" "Google Drive sync completed successfully"
-        return 0
-    else
-        log "ERROR" "Google Drive sync failed"
-        return 1
-    fi
-}
-
-# Run all syncs
+# Run all syncs (dynamic, extensible, error reporting)
 sync_all() {
     log "INFO" "Starting full sync process"
-    
     if [[ "$SYNC_ENABLED" != "true" ]]; then
         log "WARN" "Sync is disabled in configuration"
         return 0
     fi
-    
-    local success=true
-    
     # Check Unison availability
     if ! check_unison; then
         return 1
     fi
-    
-    # Sync iCloud
-    if ! sync_icloud; then
-        success=false
-    fi
-    
-    # Sync Google Drive  
-    if ! sync_google_drive; then
-        success=false
-    fi
-    
-    if [[ "$success" == "true" ]]; then
+    local services=(
+        "iCloud:ICLOUD_PATH:unison_icloud"
+        "GoogleDrive:GOOGLE_DRIVE_PATH:unison_google_drive"
+    )
+    local failed=()
+    for entry in "${services[@]}"; do
+        IFS=":" read -r name pathvar profile <<< "$entry"
+        if ! sync_service "$name" "$pathvar" "$profile"; then
+            failed+=("$name")
+        fi
+    done
+    if [[ ${#failed[@]} -eq 0 ]]; then
         log "INFO" "All syncs completed successfully"
         return 0
     else
-        log "ERROR" "Some syncs failed"
+        log "ERROR" "Some syncs failed: ${failed[*]}"
         return 1
     fi
 }
 
-# Check sync status
+# Check sync status (dynamic)
 sync_status() {
     log "INFO" "Checking sync status"
-    
     echo "=== Sync Configuration ==="
     echo "Sync Hub: $SYNC_HUB"
     echo "iCloud Path: $ICLOUD_PATH"
     echo "Google Drive Path: $GOOGLE_DRIVE_PATH"
     echo "Sync Enabled: $SYNC_ENABLED"
     echo ""
-    
     echo "=== Directory Status ==="
-    echo "Sync Hub exists: $(if [[ -d "$SYNC_HUB" ]]; then echo "Yes"; else echo "No"; fi)"
-    echo "iCloud path exists: $(if [[ -d "$ICLOUD_PATH" ]]; then echo "Yes"; else echo "No"; fi)"
-    echo "Google Drive path exists: $(if [[ -d "$GOOGLE_DRIVE_PATH" ]]; then echo "Yes"; else echo "No"; fi)"
+    for entry in "iCloud:$ICLOUD_PATH" "Google Drive:$GOOGLE_DRIVE_PATH"; do
+        IFS=":" read -r name path <<< "$entry"
+        echo "$name path exists: $(if [[ -d "$path" ]]; then echo "Yes"; else echo "No"; fi)"
+    done
     echo ""
-    
     echo "=== Unison Status ==="
     if command -v unison >/dev/null 2>&1; then
         echo "Unison installed: Yes ($(unison -version | head -1))"
@@ -205,12 +221,12 @@ main() {
             ;;
         "icloud")
             if check_unison; then
-                sync_icloud
+                sync_service "iCloud" "ICLOUD_PATH" "unison_icloud"
             fi
             ;;
         "gdrive"|"google-drive")
             if check_unison; then
-                sync_google_drive
+                sync_service "GoogleDrive" "GOOGLE_DRIVE_PATH" "unison_google_drive"
             fi
             ;;
         "status")
@@ -227,7 +243,20 @@ main() {
     esac
 }
 
+# Locking to prevent concurrent runs
+LOCKFILE="/tmp/sync_module.lock"
+acquire_lock() {
+    exec 200>"$LOCKFILE"
+    flock -n 200 || { echo "[ERROR] Another sync is already running." >&2; exit 1; }
+}
+release_lock() {
+    flock -u 200
+    rm -f "$LOCKFILE"
+}
+
 # Run main function if script is executed directly
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    acquire_lock
+    trap release_lock EXIT
     main "$@"
 fi

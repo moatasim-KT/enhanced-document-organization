@@ -13,6 +13,7 @@ export class ContentConsolidator {
     constructor(options = {}) {
         this.aiService = options.aiService || 'local'; // 'local', 'openai', 'anthropic'
         this.projectRoot = options.projectRoot;
+        this.syncHubPath = options.syncHubPath; // Configurable sync hub path
         this.outputFormat = options.outputFormat || 'markdown';
         this.preserveReferences = options.preserveReferences !== false;
         this.enhanceContent = options.enhanceContent !== false;
@@ -63,7 +64,13 @@ export class ContentConsolidator {
      */
     async createConsolidatedFolder(folderName, sampleAnalysis) {
         const category = this.determineCategory(sampleAnalysis);
-        const categoryPath = path.join(this.projectRoot, 'Sync_Hub_New', category);
+        
+        // Use configurable syncHubPath instead of hardcoded path
+        if (!this.syncHubPath) {
+            throw new Error('syncHubPath is required but not provided in ContentConsolidator options');
+        }
+        
+        const categoryPath = path.join(this.syncHubPath, category);
         const folderPath = path.join(categoryPath, folderName);
 
         // Create main folder

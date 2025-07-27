@@ -25,6 +25,15 @@ else
     exit 1
 fi
 
+# Check flock
+if command -v flock >/dev/null 2>&1; then
+    echo "✅ flock is installed"
+else
+    echo "❌ flock is not installed"
+    echo "   Install with: brew install util-linux (on macOS)"
+    exit 1
+fi
+
 # Check Node.js
 if command -v node >/dev/null 2>&1; then
     echo "✅ Node.js is installed ($(node --version))"
@@ -62,8 +71,8 @@ UNISON_DIR="$HOME/.unison"
 mkdir -p "$UNISON_DIR"
 
 # Copy profiles
-cp "$SCRIPT_DIR/unison_icloud.prf" "$UNISON_DIR/icloud.prf"
-cp "$SCRIPT_DIR/unison_google_drive.prf" "$UNISON_DIR/google_drive.prf"
+cp "$SCRIPT_DIR/config/unison_icloud.prf" "$UNISON_DIR/icloud.prf"
+cp "$SCRIPT_DIR/config/unison_google_drive.prf" "$UNISON_DIR/google_drive.prf"
 echo "   Copied Unison profiles to ~/.unison/"
 
 echo ""
@@ -71,7 +80,7 @@ echo ""
 # Setup MCP server
 echo "🤖 Setting up MCP server..."
 
-cd "$SCRIPT_DIR/mcp"
+cd "$SCRIPT_DIR/src/mcp"
 if [[ ! -d "node_modules" ]]; then
     echo "   Installing MCP server dependencies..."
     npm install

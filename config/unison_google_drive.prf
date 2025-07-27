@@ -13,10 +13,6 @@ log = true
 silent = false
 
 # Conflict resolution
-backup = Name *
-backupcurr = Name *
-backupnot = Name *.tmp
-maxbackups = 5
 
 # Standard ignore patterns
 ignore = Name .DS_Store
@@ -82,12 +78,7 @@ ignore = Name .TemporaryItems
 # Performance settings
 retry = 3
 confirmbigdel = false
-fastcheck = true
 
-# Performance and reliability settings
-retry = 3
-confirmbigdel = false
-fastcheck = true
 times = true
 perms = 0o644
 
@@ -127,8 +118,3 @@ ignore = Path */.temp
 # clientHostName = localhost
 
 # Backup and versioning
-backup = Name *
-backupcurr = Name *
-maxbackups = 3
-backupnot = Name *.tmp
-backupnot = Name *.lock

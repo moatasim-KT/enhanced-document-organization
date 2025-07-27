@@ -13,7 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Load configuration
-source "$(dirname "$PROJECT_DIR")/config/config.env"
+source "$PROJECT_DIR/../config/config.env"
 
 # Advanced features configuration
 ENABLE_DUPLICATE_DETECTION="${ENABLE_DUPLICATE_DETECTION:-true}"
@@ -164,35 +164,40 @@ run_content_analysis() {
         file_list_json+='"'$(printf '%s' "$file" | sed 's/"/\\"/g')'",'
     done
     file_list_json="${file_list_json%,}]"
+    log "DEBUG" "FILE_LIST_JSON: $file_list_json"
     
     # Run analysis
     node -e "
-        import ContentAnalyzer from '$PROJECT_DIR/organize/content_analyzer.js';
+        import { ContentAnalyzer } from '$PROJECT_DIR/organize/content_analyzer.js';
         import { promises as fs } from 'fs';
         
         async function runAnalysis() {
             const analyzer = new ContentAnalyzer({
-                similarityThreshold: $SIMILARITY_THRESHOLD,
+                similarityThreshold: process.env.SIMILARITY_THRESHOLD,
                 minContentLength: 50
             });
             
-            const fileList = $file_list_json;
+            const fileList = JSON.parse(process.env.FILE_LIST_JSON);
             console.log('Analyzing', fileList.length, 'files...');
             
             // Find duplicates
             const duplicates = await analyzer.findDuplicates(fileList);
-            await fs.writeFile('$duplicates_found', JSON.stringify([...duplicates.entries()], null, 2));
+            await fs.writeFile(process.env.DUPLICATES_FOUND, JSON.stringify([...duplicates.entries()], null, 2));
             
             // Find consolidation candidates
             const candidates = await analyzer.findConsolidationCandidates(fileList);
-            await fs.writeFile('$consolidation_candidates', JSON.stringify([...candidates.entries()], null, 2));
+            await fs.writeFile(process.env.CONSOLIDATION_CANDIDATES, JSON.stringify([...candidates.entries()], null, 2));
             
             console.log('Found', duplicates.size, 'duplicate groups');
             console.log('Found', candidates.size, 'consolidation opportunities');
         }
         
         runAnalysis().catch(console.error);
-    "
+    " \
+    SIMILARITY_THRESHOLD="$SIMILARITY_THRESHOLD" \
+    FILE_LIST_JSON="$file_list_json" \
+    DUPLICATES_FOUND="$duplicates_found" \
+    CONSOLIDATION_CANDIDATES="$consolidation_candidates"
 }
 
 # Process duplicate files
@@ -200,47 +205,55 @@ process_duplicates() {
     local duplicates_file="$1"
     local dry_run="$2"
     
-        # Process files in Inbox and root directory
-        while IFS= read -r -d '' file; do
-            # Skip hidden files and category info files
-            if [[ "$(basename "$file")" =~ ^\. ]] || [[ "$(basename "$file")" =~ _category_info\.md$ ]]; then
-                continue
-            fi
-            
-            # Determine the correct category for the file
-            local category=$(get_file_category_enhanced "$file")
-            local category_dir="$source_dir/$category"
-            
-            ensure_directory "$category_dir"
-            
-            local filename=$(basename "$file")
-            local target_path="$category_dir/$filename"
-            
-            # If the file is not in the correct category folder, move it
-            local file_dir=$(dirname "$file")
-            if [[ "$file_dir" != "$category_dir" ]]; then
-                # Handle filename conflicts
-                if [[ -e "$target_path" && "$target_path" != "$file" ]]; then
-                    local base_name="${filename%.*}"
-                    local extension="${filename##*.}"
-                    local counter=1
-                    while [[ -e "$category_dir/${base_name}_${counter}.${extension}" ]]; do
-                        ((counter++))
-                    done
-                    target_path="$category_dir/${base_name}_${counter}.${extension}"
-                    filename="${base_name}_${counter}.${extension}"
-                fi
+    if [[ ! -f "$duplicates_file" ]]; then
+        log "INFO" "No duplicates file found: $duplicates_file"
+        return 0
+    fi
+
+    log "INFO" "Processing duplicates from $duplicates_file (dry_run: $dry_run)"
+
+    local processed_count=0
+    local deleted_count=0
+
+    # Read duplicates from the JSON file
+    local duplicates_json=$(cat "$duplicates_file")
+    local duplicate_groups=$(echo "$duplicates_json" | jq -c '.[]')
+
+    for group in $duplicate_groups; do
+        local files_in_group=$(echo "$group" | jq -r '.files[]')
+        local recommended_action=$(echo "$group" | jq -r '.recommended_action')
+        local group_type=$(echo "$group" | jq -r '.type')
+
+        log "INFO" "Duplicate group ($group_type): $files_in_group"
+        log "INFO" "Recommended action: $recommended_action"
+
+        if [[ "$recommended_action" == "delete_duplicates" ]]; then
+            # Keep the first file, delete the rest
+            local keep_file=$(echo "$files_in_group" | head -n 1)
+            local files_to_delete=$(echo "$files_in_group" | tail -n +2)
+
+            for file_to_delete in $files_to_delete; do
                 if [[ "$dry_run" == "true" ]]; then
-                    log "INFO" "DRY RUN: Would move $file -> $target_path"
+                    log "INFO" "DRY RUN: Would delete duplicate file: $file_to_delete (keeping $keep_file)"
                 else
-                    log "INFO" "Moved: $file -> $target_path"
-                    mv "$file" "$target_path"
-                    ((moved_count++))
+                    if [[ -f "$file_to_delete" ]]; then
+                        log "INFO" "Deleting duplicate file: $file_to_delete (keeping $keep_file)"
+                        rm "$file_to_delete"
+                        ((deleted_count++))
+                    else
+                        log "WARN" "Duplicate file not found, skipping: $file_to_delete"
+                    fi
                 fi
-            fi
-            ((processed_count++))
-            
-        done < <(find "$source_dir" -type f -print0)
+                ((processed_count++))
+            done
+        else
+            log "INFO" "No action taken for this duplicate group (action: $recommended_action)"
+        fi
+    done
+
+    log "INFO" "Processed $processed_count duplicate files, deleted $deleted_count files"
+}
+
 # Process content consolidation candidates
 process_consolidation_candidates() {
     local candidates_file="$1"
@@ -250,33 +263,18 @@ process_consolidation_candidates() {
         return 0
     fi
     
-    local candidate_count=$(node -e "
-        const fs = require('fs');
-        const candidates = JSON.parse(fs.readFileSync('$candidates_file', 'utf-8'));
-        console.log(candidates.length);
-    ")
+    local candidate_count=$(node -e "        const fs = require('fs');        const candidates = JSON.parse(fs.readFileSync(process.env.CANDIDATES_FILE, 'utf-8'));        console.log(candidates.length);    "     CANDIDATES_FILE="$candidates_file")
     
     if [[ "$candidate_count" -gt 0 ]]; then
         log "INFO" "Processing $candidate_count consolidation candidates"
         
         if [[ "$dry_run" == "true" ]]; then
             log "INFO" "DRY RUN: Would consolidate the following content groups:"
-            node -e "
-                const fs = require('fs');
-                const candidates = JSON.parse(fs.readFileSync('$candidates_file', 'utf-8'));
-                
-                for (const [topic, candidate] of candidates) {
-                    console.log(\`Topic: \${topic} (\${candidate.files.length} files, similarity: \${candidate.avgSimilarity.toFixed(2)})\`);
-                    console.log(\`  Title: \${candidate.recommendedTitle}\`);
-                    console.log(\`  Strategy: \${candidate.consolidationStrategy}\`);
-                    console.log(\`  Files: \${candidate.files.map(f => f.filePath).join(', ')}\`);
-                    console.log('');
-                }
-            "
+            node -e "                const fs = require('fs');                const candidates = JSON.parse(fs.readFileSync(process.env.CANDIDATES_FILE, 'utf-8'));                                for (const [topic, candidate] of candidates) {                    console.log(`Topic: ${topic} (${candidate.files.length} files, similarity: ${candidate.avgSimilarity.toFixed(2)})`);                    console.log(`  Title: ${candidate.recommendedTitle}`);                    console.log(`  Strategy: ${candidate.consolidationStrategy}`);                    console.log(`  Files: ${candidate.files.map(f => f.filePath).join(', ')}`);                    console.log('');                }            " \            CANDIDATES_FILE="$candidates_file"
         else
             # Actually perform consolidation
             node -e "
-                import ContentConsolidator from '$PROJECT_DIR/organize/content_consolidator.js';
+                import { ContentConsolidator } from '$PROJECT_DIR/organize/content_consolidator.js';
                 import { promises as fs } from 'fs';
                 
                 async function consolidateContent() {
@@ -286,34 +284,38 @@ process_consolidation_candidates() {
                         enhanceContent: '$ENABLE_AI_ENHANCEMENT' === 'true'
                     });
                     
-                    const candidates = JSON.parse(await fs.readFile('$candidates_file', 'utf-8'));
+                    const candidates = JSON.parse(await fs.readFile(process.env.CANDIDATES_FILE, 'utf8'));
                     
                     for (const [topic, candidate] of candidates) {
-                        if (candidate.files.length >= $MIN_CONSOLIDATION_FILES) {
-                            console.log(\`Consolidating topic: \${topic}\`);
+                        if (candidate.files.length >= process.env.MIN_CONSOLIDATION_FILES) {
+                            console.log(`Consolidating topic: ${topic}`);
                             try {
                                 const result = await consolidator.consolidateDocuments(candidate);
-                                console.log(\`Created: \${result.consolidatedDocument}\`);
+                                console.log(`Created: ${result.consolidatedDocument}`);
                                 
                                 // Mark original files as processed (move to references)
                                 // They're already moved by the consolidator
                             } catch (error) {
-                                console.error(\`Failed to consolidate \${topic}: \${error.message}\`);
+                                console.error(`Failed to consolidate ${topic}: ${error.message}`);
                             }
                         }
                     }
                 }
                 
                 consolidateContent().catch(console.error);
-            "
+            " \
+            CANDIDATES_FILE="$candidates_file" \
+            MIN_CONSOLIDATION_FILES="$MIN_CONSOLIDATION_FILES"
         fi
     fi
 }
 
 # Organize remaining files using traditional + enhanced categorization
 organize_remaining_files() {
-    local source_dir="/Users/moatasimfarooque/Sync_Hub_New"
+    local source_dir_param="$1"
     local dry_run="$2"
+
+    local source_dir="$source_dir_param"
     
     local processed_count=0
     local moved_count=0
@@ -375,8 +377,8 @@ get_file_category_enhanced() {
     
     # Use Node.js for enhanced categorization
     local category=$(node -e "
-        import CategoryManager from '$PROJECT_DIR/organize/category_manager.js';
-        import ContentAnalyzer from '$PROJECT_DIR/organize/content_analyzer.js';
+        import { CategoryManager } from '$PROJECT_DIR/organize/category_manager.js';
+        import { ContentAnalyzer } from '$PROJECT_DIR/organize/content_analyzer.js';
         
         async function categorizeFile() {
             const manager = new CategoryManager({
@@ -404,13 +406,15 @@ get_file_category_enhanced() {
 
 # Check for category suggestions based on unmatched content
 check_category_suggestions() {
-    local source_dir="/Users/moatasimfarooque/Sync_Hub_New"
+    local source_dir_param="$1"
+    local source_dir="$source_dir_param"
+    log "DEBUG" "check_category_suggestions: source_dir is $source_dir"
     
     log "INFO" "Analyzing content for potential new categories..."
     
     node -e "
-        import CategoryManager from '$PROJECT_DIR/organize/category_manager.js';
-        import ContentAnalyzer from '$PROJECT_DIR/organize/content_analyzer.js';
+        import { CategoryManager } from '$PROJECT_DIR/organize/category_manager.js';
+        import { ContentAnalyzer } from '$PROJECT_DIR/organize/content_analyzer.js';
         import { promises as fs } from 'fs';
         import path from 'path';
         
@@ -428,7 +432,7 @@ check_category_suggestions() {
             const categories = ['${CATEGORY_AI_ML:-AI & ML}', '${CATEGORY_RESEARCH:-Research Papers}', '${CATEGORY_WEB:-Web Content}', '${CATEGORY_NOTES:-Notes & Drafts}', '${CATEGORY_DEV:-Development}'];
             
             for (const category of categories) {
-                const categoryPath = path.join('/Users/moatasimfarooque/Sync_Hub_New', category);
+                const categoryPath = path.join(process.env.SOURCE_DIR, category);
                 try {
                     const files = await fs.readdir(categoryPath);
                     for (const file of files) {
@@ -451,20 +455,20 @@ check_category_suggestions() {
             const poorlyMatched = allFiles.filter(f => f.match.confidence < 0.5);
             
             if (poorlyMatched.length >= 3) {
-                console.log(\`Found \${poorlyMatched.length} files that might benefit from a new category\`);
+                console.log(`Found ${poorlyMatched.length} files that might benefit from a new category`);
                 
                 const suggestion = await manager.suggestCategory(poorlyMatched[0].analysis, poorlyMatched);
                 if (suggestion) {
                     console.log('Category suggestion:');
-                    console.log(\`  Name: \${suggestion.name}\`);
-                    console.log(\`  Icon: \${suggestion.icon}\`);
-                    console.log(\`  Description: \${suggestion.description}\`);
-                    console.log(\`  Keywords: \${suggestion.keywords.join(', ')}\`);
-                    console.log(\`  Confidence: \${(suggestion.confidence * 100).toFixed(1)}%\`);
-                    console.log(\`  Affected files: \${suggestion.affectedFiles}\`);
+                    console.log(`  Name: ${suggestion.name}`);
+                    console.log(`  Icon: ${suggestion.icon}`);
+                    console.log(`  Description: ${suggestion.description}`);
+                    console.log(`  Keywords: ${suggestion.keywords.join(', ')}`);
+                    console.log(`  Confidence: ${(suggestion.confidence * 100).toFixed(1)}%`);
+                    console.log(`  Affected files: ${suggestion.affectedFiles}`);
                     console.log('');
                     console.log('To add this category, run:');
-                    console.log(\`  ./drive_sync.sh add-category '\${suggestion.name}' '\${suggestion.icon}' '\${suggestion.description}'\`);
+                    console.log(`  ./drive_sync.sh add-category '${suggestion.name}' '${suggestion.icon}' '${suggestion.description}'`);
                 }
             } else {
                 console.log('No new category suggestions at this time');
@@ -472,8 +476,8 @@ check_category_suggestions() {
         }
         
         checkSuggestions().catch(console.error);
-    "
-}
+    " \
+    SOURCE_DIR="$source_dir"
 
 # Utility functions
 ensure_directory() {
@@ -528,18 +532,19 @@ get_file_category_simple() {
 # Main execution
 main() {
     local command="${1:-run}"
-    local source_dir=""
-    local dry_run="${2:-false}"
+    local source_dir="$SYNC_HUB"
+    local dry_run="false"
 
-    case "$command" in
-        "run")
-            source_dir="$SYNC_HUB"
-            ;;
-        *)
-            source_dir="$command"
-            dry_run="${2:-false}"
-            ;;
-    esac
+    if [[ "$command" == "dry-run" ]]; then
+        dry_run="true"
+        command="run"
+    fi
+
+    if [[ "$command" != "run" ]]; then
+        source_dir="$command"
+    fi
+
+    dry_run="${2:-false}"
     
     if [[ ! -d "$source_dir" ]]; then
         log "ERROR" "Source directory does not exist: $source_dir"

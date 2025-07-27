@@ -68,25 +68,25 @@ show_status() {
 run_sync() {
     log "INFO" "Starting sync workflow"
     
-    if [[ ! -x "$SCRIPT_DIR/sync/sync_module.sh" ]]; then
+    if [[ ! -x "$SCRIPT_DIR/src/sync/sync_module.sh" ]]; then
         log "ERROR" "Sync module not found or not executable"
         return 1
     fi
     
-    "$SCRIPT_DIR/sync/sync_module.sh" all
+    "$SCRIPT_DIR/src/sync/sync_module.sh" all
 }
 
 # Run organization workflow
 run_organize() {
     log "INFO" "Starting enhanced organization workflow"
     
-    if [[ ! -x "$SCRIPT_DIR/organize/organize_module_enhanced.sh" ]]; then
-        log "ERROR" "Enhanced organization module not found or not executable"
+    if [[ ! -x "$SCRIPT_DIR/src/organize/organize_module.sh" ]]; then
+        log "ERROR" "Organization module not found or not executable"
         return 1
     fi
     
     local dry_run="${1:-false}"
-    "$SCRIPT_DIR/organize/organize_module_enhanced.sh" "$SYNC_HUB" "$dry_run"
+    "$SCRIPT_DIR/src/organize/organize_module.sh" "$SYNC_HUB" "$dry_run"
 }
 
 # Start MCP server
@@ -109,6 +109,8 @@ start_mcp() {
     fi
     
     cd "$SCRIPT_DIR/src/mcp"
+    export PROJECT_ROOT="$SCRIPT_DIR"
+    export SYNC_HUB="$SYNC_HUB"
     if [[ "${1:-background}" == "background" ]]; then
         nohup node server.js > /dev/null 2>&1 &
         log "INFO" "MCP server started in background"

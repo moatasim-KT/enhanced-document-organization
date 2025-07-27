@@ -79,8 +79,8 @@ ignore = Name .TemporaryItems
 # Performance settings
 retry = 3
 confirmbigdel = false
-fastcheck = true
-fastcheck = true
+
+
 times = true
 perms = 0o644
 
@@ -123,8 +123,3 @@ ignore = Path */.temp
 # clientHostName = localhost
 
 # Backup and versioning
-backup = Name *
-backupcurr = Name *
-maxbackups = 3
-backupnot = Name *.tmp
-backupnot = Name *.lock
