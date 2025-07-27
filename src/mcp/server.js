@@ -19,6 +19,7 @@ import path from 'path';
 import { execSync } from 'child_process';
 import os from 'os';
 import { createErrorHandler, ErrorTypes, EnhancedError } from '../organize/error_handler.js';
+import { ContentConsolidator } from '../organize/content_consolidator.js';
 // Dynamic imports will be handled by ModuleLoader
 
 export class DocumentOrganizationServer {
@@ -39,6 +40,7 @@ export class DocumentOrganizationServer {
     this.configLoaded = false;
     this.modulesLoaded = false;
     this.modules = {};
+    this.validationPassed = false;
 
     // Initialize enhanced error handler
     this.errorHandler = createErrorHandler('MCPServer', {
@@ -54,6 +56,7 @@ export class DocumentOrganizationServer {
 
     // Initialize paths and modules asynchronously
     this.initializePaths().then(async () => {
+      await this.runStartupValidation();
       await this.loadModules();
       this.setupToolHandlers();
       this.setupResourceHandlers();
@@ -84,9 +87,11 @@ export class DocumentOrganizationServer {
     for (let i = 0; i < maxDepth; i++) {
       const configPath = path.join(currentDir, 'config', 'config.env');
       try {
-        // Check if config.env exists
-        require('fs').accessSync(configPath);
-        return currentDir;
+        // Check if config.env exists using existsSync instead of accessSync
+        if (require('fs').existsSync(configPath)) {
+          return currentDir;
+        }
+        throw new Error('Config file not found');
       } catch (error) {
         // Move up one directory
         const parentDir = path.dirname(currentDir);
@@ -100,6 +105,51 @@ export class DocumentOrganizationServer {
 
     // Fallback to current working directory
     return process.cwd();
+  }
+
+  /**
+   * Run startup validation
+   */
+  async runStartupValidation() {
+    return await this.errorHandler.wrapAsync(async () => {
+      await this.logInfo('Running MCP server startup validation...');
+
+      // Check if startup validator exists
+      const validatorPath = path.join(this.projectRoot, 'src', 'organize', 'startup_validator.js');
+      
+      try {
+        await fs.access(validatorPath);
+        
+        // Import and run validation
+        const validatorModule = await import(`file://${validatorPath}`);
+        const result = await validatorModule.runStartupValidation({
+          verbose: false,
+          skipFastFail: true,
+          printReport: false
+        });
+
+        if (result.success) {
+          this.validationPassed = true;
+          await this.logInfo('Startup validation passed', {
+            totalChecks: result.result.summary.totalChecks,
+            warnings: result.result.warnings.length
+          });
+        } else {
+          await this.logWarn('Startup validation failed, continuing with degraded functionality', {
+            criticalFailures: result.result.criticalFailures.length,
+            warnings: result.result.warnings.length
+          });
+        }
+
+      } catch (error) {
+        await this.logWarn('Could not run startup validation', {
+          validatorPath,
+          error: error.message
+        });
+      }
+    }, {
+      operation: 'runStartupValidation'
+    });
   }
 
   /**
@@ -651,12 +701,15 @@ export class DocumentOrganizationServer {
         let result;
         switch (name) {
           case 'search_documents':
+            this.validateToolArguments('search_documents', args);
             result = await this.searchDocuments(args);
             break;
           case 'get_document_content':
+            this.validateToolArguments('get_document_content', args);
             result = await this.getDocumentContent(args);
             break;
           case 'create_document':
+            this.validateToolArguments('create_document', args);
             result = await this.createDocument(args);
             break;
           case 'organize_documents':
@@ -710,19 +763,30 @@ export class DocumentOrganizationServer {
 
         await this.logInfo(`Tool call completed successfully: ${name}`, {
           requestId,
-          toolName: name
+          toolName: name,
+          executionTime: Date.now() - parseInt(requestId.split('_')[1])
         });
 
         return result;
-      } catch (error) {
-        await this.logError(`Tool call failed: ${name}`, {
-          requestId,
+      }, {
+        operation: 'toolCall',
+        toolName: name,
+        requestId,
+        args: this.sanitizeArgsForLogging(args)
+      }, {
+        maxRetries: 1, // Most tools shouldn't be retried automatically
+        retryDelay: 1000
+      }).catch(async (error) => {
+        // Final error handling with comprehensive logging
+        await this.errorHandler.handleCriticalError(error, {
+          operation: 'toolCall',
           toolName: name,
+          requestId,
           args: this.sanitizeArgsForLogging(args)
-        }, error);
+        });
 
         return this.formatErrorResponse(error, name, requestId);
-      }
+      });
     });
   }
 
@@ -865,17 +929,71 @@ export class DocumentOrganizationServer {
     }
   }
 
+  /**
+   * Validate tool arguments with enhanced error handling
+   */
+  validateToolArguments(toolName, args, schema) {
+    if (!args || typeof args !== 'object') {
+      throw this.errorHandler.createContextualError(
+        'Arguments must be provided as an object',
+        ErrorTypes.VALIDATION_ERROR,
+        { operation: 'validateArguments', toolName, argsType: typeof args }
+      );
+    }
+
+    // Tool-specific validation
+    switch (toolName) {
+      case 'get_document_content':
+        if (!args.file_path || typeof args.file_path !== 'string') {
+          throw this.errorHandler.createContextualError(
+            'file_path is required and must be a string',
+            ErrorTypes.VALIDATION_ERROR,
+            { operation: 'validateArguments', toolName, file_path: args.file_path }
+          );
+        }
+        if (args.file_path.includes('..') || path.isAbsolute(args.file_path)) {
+          throw this.errorHandler.createContextualError(
+            'Invalid file path: relative paths only, no parent directory access',
+            ErrorTypes.VALIDATION_ERROR,
+            { operation: 'validateArguments', toolName, file_path: args.file_path }
+          );
+        }
+        break;
+
+      case 'search_documents':
+        if (!args.query || typeof args.query !== 'string' || args.query.trim() === '') {
+          throw this.errorHandler.createContextualError(
+            'query is required and must be a non-empty string',
+            ErrorTypes.VALIDATION_ERROR,
+            { operation: 'validateArguments', toolName, query: args.query }
+          );
+        }
+        break;
+
+      case 'create_document':
+        if (!args.title || typeof args.title !== 'string' || args.title.trim() === '') {
+          throw this.errorHandler.createContextualError(
+            'title is required and must be a non-empty string',
+            ErrorTypes.VALIDATION_ERROR,
+            { operation: 'validateArguments', toolName, title: args.title }
+          );
+        }
+        if (!args.content || typeof args.content !== 'string') {
+          throw this.errorHandler.createContextualError(
+            'content is required and must be a string',
+            ErrorTypes.VALIDATION_ERROR,
+            { operation: 'validateArguments', toolName, content: typeof args.content }
+          );
+        }
+        break;
+    }
+  }
+
   async getDocumentContent(args) {
+    // Enhanced argument validation
+    this.validateToolArguments('get_document_content', args);
+
     const { file_path } = args;
-
-    if (!file_path || typeof file_path !== 'string') {
-      throw new Error('file_path is required and must be a string');
-    }
-
-    // Validate file path for security
-    if (file_path.includes('..') || path.isAbsolute(file_path)) {
-      throw new Error('Invalid file path: relative paths only, no parent directory access');
-    }
 
     try {
       const fullPath = path.join(this.syncHub, file_path);
@@ -1740,5 +1858,5 @@ const docOrgServer = new DocumentOrganizationServer();
 
 docOrgServer.run().catch(async (err) => {
   await docOrgServer.logError('Server startup error', {}, err);
-  process.exit(1);
+  throw new Error(`Server startup failed: ${err.message}`);
 });

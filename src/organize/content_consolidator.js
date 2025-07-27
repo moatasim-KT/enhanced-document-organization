@@ -31,15 +31,6 @@ export class ContentConsolidator {
      */
     async consolidateDocuments(consolidationCandidate) {
         return await this.errorHandler.wrapAsync(async () => {
-            const { topic, files, consolidationStrategy } = consolidationCandidate;
-
-            await this.errorHandler.logInfo(`Starting consolidation of ${files.length} documents`, {
-                topic,
-                fileCount: files.length,
-                strategy: consolidationStrategy,
-                operation: 'consolidateDocuments'
-            });
-
             // Validate inputs with comprehensive error context
             if (!consolidationCandidate) {
                 throw this.errorHandler.createContextualError(
@@ -48,6 +39,8 @@ export class ContentConsolidator {
                     { operation: 'consolidateDocuments', input: 'consolidationCandidate' }
                 );
             }
+
+            const { topic, files, consolidationStrategy } = consolidationCandidate;
 
             if (!topic || typeof topic !== 'string') {
                 throw this.errorHandler.createContextualError(
@@ -72,13 +65,20 @@ export class ContentConsolidator {
             }
 
             // Validate sync hub path
-            if (!this.syncHubPath) {
+            if (!this.syncHubPath || this.syncHubPath.trim() === '') {
                 throw this.errorHandler.createContextualError(
                     'Sync hub path not configured',
                     ErrorTypes.CONFIGURATION_ERROR,
                     { operation: 'consolidateDocuments', topic, syncHubPath: this.syncHubPath }
                 );
             }
+
+            await this.errorHandler.logInfo(`Starting consolidation of ${files.length} documents`, {
+                topic,
+                fileCount: files.length,
+                strategy: consolidationStrategy,
+                operation: 'consolidateDocuments'
+            });
 
             if (!this.syncHubPath) {
                 throw new EnhancedError(
@@ -158,7 +158,7 @@ export class ContentConsolidator {
             };
         }, {
             operation: 'consolidateDocuments',
-            topic: consolidationCandidate.topic
+            topic: consolidationCandidate?.topic || 'unknown'
         });
     }
 
@@ -334,7 +334,7 @@ export class ContentConsolidator {
             images.push(...imageMatches.map(img => ({ img, source: index })));
 
             // Extract text content (without code and images)
-            let textOnly = c.content
+            const textOnly = c.content
                 .replace(/```[\s\S]*?```/g, '')
                 .replace(/!\[.*\]\(.+\)/g, '');
             textContent.push({ text: textOnly, metadata: c.metadata });
@@ -342,7 +342,7 @@ export class ContentConsolidator {
 
         // Merge text content
         merged += '\n## Overview\n\n';
-        textContent.forEach((tc, index) => {
+        textContent.forEach((tc, _index) => {
             if (tc.text.trim()) {
                 merged += `### From ${tc.metadata.suggestedTitle}\n\n${tc.text.trim()}\n\n`;
             }
@@ -359,7 +359,7 @@ export class ContentConsolidator {
         // Add images if any
         if (images.length > 0) {
             merged += '\n## Visual References\n\n';
-            images.forEach((img, index) => {
+            images.forEach((img, _index) => {
                 merged += `${img.img}\n\n`;
             });
         }
@@ -487,7 +487,7 @@ Please return only the enhanced content in markdown format, without any explanat
 
             // Example using curl to call Ollama API
             const response = execSync(`curl -s -X POST http://localhost:11434/api/generate -d '${JSON.stringify({
-                model: "llama2",
+                model: 'llama2',
                 prompt: prompt,
                 stream: false
             })}'`, {
@@ -522,7 +522,7 @@ Please return only the enhanced content in markdown format, without any explanat
     /**
      * Call MCP service for AI enhancement
      */
-    async callMCPService(prompt) {
+    async callMCPService(_prompt) {
         // This would integrate with the MCP server
         // For now, return null to indicate no enhancement
         return null;
@@ -532,7 +532,7 @@ Please return only the enhanced content in markdown format, without any explanat
      * Create consolidated document with metadata
      */
     async createConsolidatedDocument(content, consolidationCandidate, targetFolder) {
-        const { recommendedTitle, files } = consolidationCandidate;
+        const { recommendedTitle: _recommendedTitle, files: _files } = consolidationCandidate;
 
         const metadata = this.createDocumentMetadata(consolidationCandidate);
         const fullContent = metadata + content;

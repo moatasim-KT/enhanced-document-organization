@@ -138,7 +138,7 @@ export class CategoryManager {
      * Suggest new category based on content analysis
      */
     async suggestCategory(contentAnalysis, existingFiles = []) {
-        const { topics, contentType, metadata } = contentAnalysis;
+        const { topics: _topics, contentType: _contentType, metadata: _metadata } = contentAnalysis;
 
         // Check if content fits existing categories
         const bestMatch = this.findBestCategoryMatch(contentAnalysis);
@@ -211,7 +211,7 @@ export class CategoryManager {
      */
     calculateCategoryMatch(contentAnalysis, category) {
         let score = 0;
-        const { topics, contentType, metadata, structure } = contentAnalysis;
+        const { topics, contentType, metadata, structure: _structure } = contentAnalysis;
 
         // Keyword matching
         const allText = [...topics, contentType, metadata.suggestedTitle || ''].join(' ').toLowerCase();
@@ -244,8 +244,8 @@ export class CategoryManager {
     generateCategorySuggestion(unmatchedContent) {
         // Analyze common topics and patterns
         const topicFrequency = new Map();
-        const commonKeywords = new Set();
-        const commonPatterns = new Set();
+        const _commonKeywords = new Set();
+        const _commonPatterns = new Set();
 
         unmatchedContent.forEach(content => {
             content.analysis.topics.forEach(topic => {

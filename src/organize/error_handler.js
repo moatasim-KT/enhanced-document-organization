@@ -168,6 +168,9 @@ export class ErrorHandler {
         if (message.includes('content') || message.includes('parse') || message.includes('process')) {
             return ErrorTypes.CONTENT_PROCESSING_ERROR;
         }
+        if (message.includes('temporary') || message.includes('retry')) {
+            return ErrorTypes.ASYNC_OPERATION_ERROR; // Temporary failures should be retryable
+        }
 
         return ErrorTypes.UNKNOWN_ERROR;
     }
@@ -175,7 +178,7 @@ export class ErrorHandler {
     /**
      * Create recovery strategy based on error type
      */
-    static createRecoveryStrategy(errorType, context = {}) {
+    static createRecoveryStrategy(errorType, _context = {}) {
         const strategies = {
             [ErrorTypes.FILE_NOT_FOUND]: {
                 action: 'skip',
@@ -246,13 +249,23 @@ export class ErrorHandler {
      * Handle error with comprehensive processing
      */
     async handleError(error, context = {}) {
-        const errorType = ErrorHandler.classifyError(error);
-        const enhancedError = new EnhancedError(
-            error.message || 'Unknown error occurred',
-            errorType,
-            { ...context, component: this.component },
-            error
-        );
+        // Preserve existing error type if it's already an EnhancedError
+        const errorType = error.type || ErrorHandler.classifyError(error);
+        
+        let enhancedError;
+        if (error instanceof EnhancedError) {
+            // If it's already an EnhancedError, preserve it but add context
+            enhancedError = error;
+            enhancedError.context = { ...enhancedError.context, ...context, component: this.component };
+        } else {
+            // Create new EnhancedError
+            enhancedError = new EnhancedError(
+                error.message || 'Unknown error occurred',
+                errorType,
+                { ...context, component: this.component },
+                error
+            );
+        }
 
         const recoveryStrategy = ErrorHandler.createRecoveryStrategy(errorType, context);
 
@@ -278,18 +291,19 @@ export class ErrorHandler {
      * Wrap async operations with error handling
      */
     async wrapAsync(operation, context = {}, retryOptions = {}) {
-        const maxRetries = retryOptions.maxRetries || 3;
+        const maxRetries = retryOptions.maxRetries || 0; // Default to no retries
         const retryDelay = retryOptions.retryDelay || 1000;
         const backoffMultiplier = retryOptions.backoffMultiplier || 2;
 
         let lastError = null;
         let currentDelay = retryDelay;
+        const totalAttempts = maxRetries + 1; // First attempt + retries
 
-        for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+        for (let attempt = 1; attempt <= totalAttempts; attempt++) {
             try {
                 await this.logDebug(`Attempting operation: ${context.operation || 'unknown'}`, {
                     attempt,
-                    maxAttempts: maxRetries + 1,
+                    maxAttempts: totalAttempts,
                     ...context
                 });
 
@@ -305,16 +319,17 @@ export class ErrorHandler {
                 const errorInfo = await this.handleError(error, {
                     ...context,
                     attempt,
-                    maxAttempts: maxRetries + 1
+                    maxAttempts: totalAttempts
                 });
 
-                if (attempt === maxRetries + 1 || !errorInfo.shouldRetry) {
+                // Don't retry if this is the last attempt or error is not retryable
+                if (attempt === totalAttempts || !errorInfo.shouldRetry) {
                     throw errorInfo.error;
                 }
 
                 await this.logWarn(`Operation failed, retrying in ${currentDelay}ms`, {
                     attempt,
-                    maxAttempts: maxRetries + 1,
+                    maxAttempts: totalAttempts,
                     error: error.message,
                     ...context
                 });

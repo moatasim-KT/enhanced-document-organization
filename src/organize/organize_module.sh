@@ -12,8 +12,45 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-# Load configuration
-source "$PROJECT_DIR/../config/config.env"
+# Load configuration with validation
+CONFIG_FILE="$PROJECT_DIR/../config/config.env"
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    echo "❌ Configuration file not found: $CONFIG_FILE"
+    echo "💡 Run system validation: node $PROJECT_DIR/startup_validator.js"
+    exit 1
+fi
+
+source "$CONFIG_FILE"
+
+# Validate critical configuration variables
+validate_config() {
+    local missing_vars=()
+    
+    if [[ -z "${SYNC_HUB:-}" ]]; then
+        missing_vars+=("SYNC_HUB")
+    fi
+    
+    if [[ -z "${LOG_LEVEL:-}" ]]; then
+        LOG_LEVEL="INFO"
+    fi
+    
+    if [[ -z "${LOG_TO_CONSOLE:-}" ]]; then
+        LOG_TO_CONSOLE="true"
+    fi
+    
+    if [[ -z "${LOG_TO_FILE:-}" ]]; then
+        LOG_TO_FILE="true"
+    fi
+    
+    if [[ ${#missing_vars[@]} -gt 0 ]]; then
+        echo "❌ Missing required configuration variables: ${missing_vars[*]}"
+        echo "💡 Run system validation: node $PROJECT_DIR/startup_validator.js"
+        exit 1
+    fi
+}
+
+# Run configuration validation
+validate_config
 
 # Advanced features configuration
 ENABLE_DUPLICATE_DETECTION="${ENABLE_DUPLICATE_DETECTION:-true}"

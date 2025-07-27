@@ -394,7 +394,7 @@ async function main() {
     }
 }
 
-async function handleDuplicates(processor, args) {
+async function handleDuplicates(processor, _args) {
     const fileListJson = process.env.FILE_LIST_JSON;
     const outputFile = process.env.DUPLICATES_FOUND;
 
@@ -414,7 +414,7 @@ async function handleDuplicates(processor, args) {
     console.log(`Duplicates analysis complete. Results written to ${outputFile}`);
 }
 
-async function handleConsolidation(processor, args) {
+async function handleConsolidation(processor, _args) {
     const fileListJson = process.env.FILE_LIST_JSON;
     const outputFile = process.env.CONSOLIDATION_CANDIDATES;
 
@@ -434,7 +434,7 @@ async function handleConsolidation(processor, args) {
     console.log(`Consolidation analysis complete. Results written to ${outputFile}`);
 }
 
-async function handleCategorization(processor, args) {
+async function handleCategorization(processor, _args) {
     const fileListJson = process.env.FILE_LIST_JSON;
 
     if (!fileListJson) {

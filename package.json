@@ -1,0 +1,15 @@
+{
+  "type": "module",
+  "scripts": {
+    "lint": "eslint src/ test/",
+    "lint:fix": "eslint src/ test/ --fix",
+    "lint:check": "eslint src/ test/ --max-warnings 0",
+    "test": "node test/run_tests.js",
+    "validate": "node src/organize/startup_validator.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.32.0",
+    "eslint": "^9.32.0",
+    "eslint-plugin-react": "^7.37.5"
+  }
+}

@@ -10,6 +10,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Load configuration
+if [[ ! -f "$SCRIPT_DIR/config/config.env" ]]; then
+    echo "❌ Configuration file not found: $SCRIPT_DIR/config/config.env"
+    echo "💡 Run startup validation: node src/organize/startup_validator.js"
+    echo "💡 Or run setup: ./setup.sh"
+    exit 1
+fi
+
 source "$SCRIPT_DIR/config/config.env"
 
 # Logging function
@@ -62,6 +69,9 @@ show_status() {
     else
         echo "MCP Server: ⚪ Disabled"
     fi
+    
+    echo ""
+    echo "💡 For detailed system validation, run: node src/organize/startup_validator.js"
 }
 
 # Run sync workflow
@@ -190,6 +200,8 @@ Commands:
     mcp stop            - Stop MCP server
     mcp status          - Check MCP server status
     status              - Show system status
+    validate [options]  - Run comprehensive system validation
+    test [options]      - Run test suite
     help                - Show this help message
 
 Examples:
@@ -200,6 +212,9 @@ Examples:
     $0 organize dry-run # Preview organization
     $0 mcp start        # Start AI integration server
     $0 status           # Check system status
+    $0 validate         # Run system validation
+    $0 validate --verbose # Detailed validation
+    $0 test             # Run test suite
 
 Configuration:
     Edit config.env to modify system settings and paths.
@@ -246,6 +261,26 @@ main() {
             ;;
         "status")
             show_status
+            ;;
+        "validate")
+            echo "🔍 Running comprehensive system validation..."
+            if command -v node >/dev/null 2>&1; then
+                node "$SCRIPT_DIR/src/organize/startup_validator.js" "${@:2}"
+            else
+                echo "❌ Node.js is required for system validation"
+                echo "💡 Install Node.js and try again"
+                exit 1
+            fi
+            ;;
+        "test")
+            echo "🧪 Running test suite..."
+            if command -v node >/dev/null 2>&1; then
+                node "$SCRIPT_DIR/test/run_tests.js" "${@:2}"
+            else
+                echo "❌ Node.js is required for running tests"
+                echo "💡 Install Node.js and try again"
+                exit 1
+            fi
             ;;
         "help"|"--help"|"-h")
             show_help
