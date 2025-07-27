@@ -6,6 +6,7 @@
  */
 
 import { promises as fs } from 'fs';
+import { accessSync, constants as fsConstants, readFileSync, existsSync } from 'fs';
 import path from 'path';
 import os from 'os';
 
@@ -87,7 +88,16 @@ export class EnhancedError extends Error {
 export class ErrorHandler {
     constructor(options = {}) {
         this.projectRoot = options.projectRoot || this.detectProjectRoot();
+        
+        // Load configuration from config folder
+        this.config = this.loadConfiguration();
+        
+        // Set up logging directory (always within project, never in sync folder)
         this.logDirectory = options.logDirectory || path.join(this.projectRoot, 'logs');
+        
+        // Ensure sync folder is NEVER created in project directory
+        this.syncFolderPath = this.config.syncFolderPath || '/Users/moatasimfarooque/Sync_Hub_New';
+        
         this.component = options.component || 'system';
         this.enableConsoleLogging = options.enableConsoleLogging !== false;
         this.enableFileLogging = options.enableFileLogging !== false;
@@ -95,32 +105,279 @@ export class ErrorHandler {
         this.maxLogFileSize = options.maxLogFileSize || 10 * 1024 * 1024; // 10MB
         this.maxLogFiles = options.maxLogFiles || 5;
 
+        // Validate paths to prevent sync folder creation in project
+        this.validatePaths();
+        
         // Ensure log directory exists
         this.ensureLogDirectory();
     }
 
     /**
-     * Detect project root directory
+     * Detect project root directory with multiple robust indicators
+     * NEVER allows defaulting to system root (/) to prevent permission issues
      */
     detectProjectRoot() {
-        let currentDir = process.cwd();
-        const maxDepth = 5;
-
-        for (let i = 0; i < maxDepth; i++) {
-            const configPath = path.join(currentDir, 'config', 'config.env');
+        // Strategy 1: Use this file's location (most reliable)
+        if (import.meta.url) {
             try {
-                require('fs').accessSync(configPath);
-                return currentDir;
+                const currentFileDir = path.dirname(new URL(import.meta.url).pathname);
+                // Navigate up from src/organize to project root
+                const potentialRoot = path.resolve(currentFileDir, '../../');
+                if (this.isProjectRoot(potentialRoot)) {
+                    console.log(`[ProjectRoot] Detected via import.meta.url: ${potentialRoot}`);
+                    return potentialRoot;
+                }
             } catch (error) {
-                const parentDir = path.dirname(currentDir);
-                if (parentDir === currentDir) break;
-                currentDir = parentDir;
+                console.warn(`[ProjectRoot] import.meta.url detection failed: ${error.message}`);
             }
         }
+        
+        // Strategy 2: Known absolute path (most reliable fallback)
+        const knownProjectPath = '/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync';
+        if (this.isProjectRoot(knownProjectPath)) {
+            console.log(`[ProjectRoot] Using known absolute path: ${knownProjectPath}`);
+            return knownProjectPath;
+        }
+        
+        // Strategy 3: Search from current working directory
+        let currentDir = process.cwd();
+        console.log(`[ProjectRoot] Starting search from cwd: ${currentDir}`);
+        
+        const maxDepth = 10;
+        const projectIndicators = [
+            // Primary indicators (most reliable)
+            'package.json',
+            '.git',
+            'config/config.env',
+            
+            // Secondary indicators
+            'src',
+            'node_modules',
+            '.gitignore',
+            'README.md',
+            'yarn.lock',
+            'package-lock.json'
+        ];
 
-        return process.cwd();
+        // Search upward from current directory
+        for (let i = 0; i < maxDepth; i++) {
+            // Check if this directory has project indicators
+            if (this.isProjectRoot(currentDir)) {
+                return currentDir;
+            }
+            
+            const parentDir = path.dirname(currentDir);
+            
+            // Stop if we've reached the filesystem root or can't go higher
+            if (parentDir === currentDir || parentDir === '/') {
+                break;
+            }
+            
+            currentDir = parentDir;
+        }
+
+        // Strategy 4: Comprehensive fallback strategies (NEVER allow system root)
+        const fallbacks = [
+            // Primary: Known absolute path
+            '/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync',
+            
+            // Secondary: Search common locations
+            path.join(os.homedir(), 'Downloads/Programming/CascadeProjects/Drive_sync'),
+            path.join(os.homedir(), 'Downloads/Drive_sync'),
+            path.join(os.homedir(), 'Drive_sync'),
+            
+            // Tertiary: Safe fallback to user's home directory with a subdirectory
+            path.join(os.homedir(), '.drive_sync'),
+            
+            // Last resort: temp directory (but create project structure)
+            path.join(os.tmpdir(), 'drive_sync_fallback')
+        ];
+        
+        console.warn(`[ProjectRoot] All detection strategies failed, trying fallbacks...`);
+        
+        for (const fallback of fallbacks) {
+            console.log(`[ProjectRoot] Checking fallback: ${fallback}`);
+            if (this.isProjectRoot(fallback)) {
+                console.log(`[ProjectRoot] Using fallback: ${fallback}`);
+                return fallback;
+            }
+        }
+        
+        // CRITICAL: Never return system root - use first known good path
+        const safeFallback = fallbacks[0];
+        console.error(`[ProjectRoot] CRITICAL: All fallbacks failed, using safe default: ${safeFallback}`);
+        console.error(`[ProjectRoot] This may indicate a serious configuration issue`);
+        return safeFallback;
+    }
+    
+    /**
+     * Check if a directory is likely the project root
+     */
+    isProjectRoot(dirPath) {
+        try {
+            // Primary indicators (any one of these is sufficient)
+            const primaryIndicators = [
+                path.join(dirPath, 'package.json'),
+                path.join(dirPath, 'config', 'config.env')
+            ];
+            
+            for (const indicator of primaryIndicators) {
+                try {
+                    // Use synchronous access check
+                    accessSync(indicator, fsConstants.F_OK);
+                    
+                    // Additional validation: ensure it's not just a node_modules package.json
+                    if (indicator.endsWith('package.json')) {
+                        const parentDir = path.dirname(indicator);
+                        if (path.basename(parentDir) === 'node_modules' || 
+                            parentDir.includes('node_modules')) {
+                            continue;
+                        }
+                    }
+                    return true;
+                } catch (error) {
+                    // Continue checking other indicators
+                }
+            }
+            
+            // Secondary validation: check for src directory structure
+            const srcDir = path.join(dirPath, 'src');
+            const organizeDir = path.join(dirPath, 'src', 'organize');
+            
+            try {
+                accessSync(srcDir, fsConstants.F_OK);
+                accessSync(organizeDir, fsConstants.F_OK);
+                return true;
+            } catch (error) {
+                // Not a match
+            }
+            
+            return false;
+        } catch (error) {
+            return false;
+        }
     }
 
+    /**
+     * Load configuration from the config folder
+     */
+    loadConfiguration() {
+        const configDir = path.join(this.projectRoot, 'config');
+        const configFile = path.join(configDir, 'config.env');
+        
+        try {
+            // Check if config directory exists
+            if (!existsSync(configDir)) {
+                console.warn(`Config directory not found: ${configDir}`);
+                return this.getDefaultConfig();
+            }
+            
+            // Check if config file exists
+            if (!existsSync(configFile)) {
+                console.warn(`Config file not found: ${configFile}`);
+                return this.getDefaultConfig();
+            }
+            
+            // Read and parse config file
+            const configContent = readFileSync(configFile, 'utf8');
+            const config = this.parseConfigFile(configContent);
+            
+            // Validate critical paths
+            if (config.syncFolderPath && config.syncFolderPath.startsWith(this.projectRoot)) {
+                console.error(`CRITICAL: Sync folder path cannot be within project directory!`);
+                console.error(`Project root: ${this.projectRoot}`);
+                console.error(`Sync folder path: ${config.syncFolderPath}`);
+                config.syncFolderPath = '/Users/moatasimfarooque/Sync_Hub_New';
+            }
+            
+            return config;
+        } catch (error) {
+            console.error(`Failed to load configuration: ${error.message}`);
+            return this.getDefaultConfig();
+        }
+    }
+    
+    /**
+     * Parse configuration file content
+     */
+    parseConfigFile(content) {
+        const config = {};
+        const lines = content.split('\n');
+        
+        for (const line of lines) {
+            const trimmedLine = line.trim();
+            
+            // Skip comments and empty lines
+            if (!trimmedLine || trimmedLine.startsWith('#') || trimmedLine.startsWith('//')) {
+                continue;
+            }
+            
+            // Parse key=value pairs
+            const equalIndex = trimmedLine.indexOf('=');
+            if (equalIndex > 0) {
+                const key = trimmedLine.substring(0, equalIndex).trim();
+                let value = trimmedLine.substring(equalIndex + 1).trim();
+                
+                // Remove quotes if present
+                if ((value.startsWith('"') && value.endsWith('"')) || 
+                    (value.startsWith("'") && value.endsWith("'"))) {
+                    value = value.slice(1, -1);
+                }
+                
+                // Map common config keys
+                if (key.toLowerCase().includes('sync') && key.toLowerCase().includes('path')) {
+                    config.syncFolderPath = value;
+                } else if (key.toLowerCase().includes('log') && key.toLowerCase().includes('level')) {
+                    config.logLevel = value;
+                } else {
+                    config[key] = value;
+                }
+            }
+        }
+        
+        return config;
+    }
+    
+    /**
+     * Get default configuration
+     */
+    getDefaultConfig() {
+        return {
+            syncFolderPath: '/Users/moatasimfarooque/Sync_Hub_New',
+            logLevel: 'INFO'
+        };
+    }
+    
+    /**
+     * Validate paths to ensure sync folder is never in project directory
+     */
+    validatePaths() {
+        // Ensure sync folder path is absolute and outside project
+        if (this.syncFolderPath) {
+            const resolvedSyncPath = path.resolve(this.syncFolderPath);
+            const resolvedProjectPath = path.resolve(this.projectRoot);
+            
+            // Check if sync path is within project directory
+            if (resolvedSyncPath.startsWith(resolvedProjectPath)) {
+                console.error(`CRITICAL ERROR: Sync folder cannot be within project directory!`);
+                console.error(`Project root: ${resolvedProjectPath}`);
+                console.error(`Sync folder: ${resolvedSyncPath}`);
+                console.error(`Resetting sync folder to safe default.`);
+                this.syncFolderPath = '/Users/moatasimfarooque/Sync_Hub_New';
+            }
+        }
+        
+        // Ensure log directory is within project (this is correct)
+        const resolvedLogPath = path.resolve(this.logDirectory);
+        const resolvedProjectPath = path.resolve(this.projectRoot);
+        
+        if (!resolvedLogPath.startsWith(resolvedProjectPath)) {
+            console.warn(`Log directory is outside project root, this may cause permission issues.`);
+            console.warn(`Project root: ${resolvedProjectPath}`);
+            console.warn(`Log directory: ${resolvedLogPath}`);
+        }
+    }
+    
     /**
      * Ensure log directory exists
      */

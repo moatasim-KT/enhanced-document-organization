@@ -6,7 +6,9 @@
  */
 
 import { promises as fs } from 'fs';
+import { accessSync, existsSync, constants as fsConstants } from 'fs';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -14,11 +16,114 @@ const __dirname = path.dirname(__filename);
 
 export class ModuleLoader {
     constructor(options = {}) {
-        this.baseDir = options.baseDir || __dirname;
+        // Detect project root first (most reliable)
+        this.projectRoot = this.detectProjectRootFromFile();
+        
+        // Validate and set base directory
+        if (options.baseDir) {
+            // If baseDir is provided, ensure it's within the project root
+            const resolvedBaseDir = path.resolve(options.baseDir);
+            const expectedBaseDir = path.join(this.projectRoot, 'src', 'organize');
+            
+            // Only use provided baseDir if it's the correct organize directory
+            if (resolvedBaseDir === expectedBaseDir) {
+                this.baseDir = resolvedBaseDir;
+            } else {
+                console.warn(`[ModuleLoader] Invalid baseDir provided: ${resolvedBaseDir}`);
+                console.warn(`[ModuleLoader] Expected: ${expectedBaseDir}`);
+                console.warn(`[ModuleLoader] Using correct path instead`);
+                this.baseDir = expectedBaseDir;
+            }
+        } else {
+            // Default to organize folder within project root
+            this.baseDir = path.join(this.projectRoot, 'src', 'organize');
+        }
+        
         this.retryAttempts = options.retryAttempts || 3;
         this.retryDelay = options.retryDelay || 1000;
         this.moduleCache = new Map();
         this.failedModules = new Set();
+        
+        console.log(`[ModuleLoader] Initialized with projectRoot: ${this.projectRoot}`);
+        console.log(`[ModuleLoader] Base directory: ${this.baseDir}`);
+    }
+    
+    /**
+     * Detect project root from the current file's location
+     * NEVER allows defaulting to system root (/) to prevent permission issues
+     */
+    detectProjectRootFromFile() {
+        // Strategy 1: Use this file's location (most reliable)
+        if (import.meta.url) {
+            try {
+                const currentFileDir = path.dirname(new URL(import.meta.url).pathname);
+                // Navigate up from src/organize to project root
+                const potentialRoot = path.resolve(currentFileDir, '../../');
+                if (this.isProjectRoot(potentialRoot)) {
+                    console.log(`[ModuleLoader] Detected project root via import.meta.url: ${potentialRoot}`);
+                    return potentialRoot;
+                }
+            } catch (error) {
+                console.warn(`[ModuleLoader] import.meta.url detection failed: ${error.message}`);
+            }
+        }
+        
+        // Strategy 2: Known absolute path (most reliable fallback)
+        const knownProjectPath = '/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync';
+        if (this.isProjectRoot(knownProjectPath)) {
+            console.log(`[ModuleLoader] Using known absolute path: ${knownProjectPath}`);
+            return knownProjectPath;
+        }
+        
+        // Strategy 3: Comprehensive fallback strategies (NEVER allow system root)
+        const fallbacks = [
+            '/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync',
+            path.join(os.homedir(), 'Downloads/Programming/CascadeProjects/Drive_sync'),
+            path.join(os.homedir(), 'Downloads/Drive_sync'),
+            path.join(os.homedir(), 'Drive_sync')
+        ];
+        
+        console.warn(`[ModuleLoader] All detection strategies failed, trying fallbacks...`);
+        
+        for (const fallback of fallbacks) {
+            if (this.isProjectRoot(fallback)) {
+                console.log(`[ModuleLoader] Using fallback: ${fallback}`);
+                return fallback;
+            }
+        }
+        
+        // CRITICAL: Never return system root - use first known good path
+        const safeFallback = fallbacks[0];
+        console.error(`[ModuleLoader] CRITICAL: All fallbacks failed, using safe default: ${safeFallback}`);
+        return safeFallback;
+    }
+    
+    /**
+     * Check if a directory is likely the project root
+     */
+    isProjectRoot(dirPath) {
+        try {
+            // Primary indicators (any one of these is sufficient)
+            const primaryIndicators = [
+                path.join(dirPath, 'package.json'),
+                path.join(dirPath, '.git'),
+                path.join(dirPath, 'config', 'config.env')
+            ];
+            
+            for (const indicator of primaryIndicators) {
+                if (existsSync(indicator)) {
+                    return true;
+                }
+            }
+            
+            // Secondary indicators (need multiple)
+            const srcExists = existsSync(path.join(dirPath, 'src'));
+            const organizeExists = existsSync(path.join(dirPath, 'src', 'organize'));
+            
+            return srcExists && organizeExists;
+        } catch (error) {
+            return false;
+        }
     }
 
     /**
@@ -46,12 +151,29 @@ export class ModuleLoader {
         }
 
         const resolvedPath = this.resolvePath(modulePath);
+        
+        // Convert to file:// URL for consistent import behavior
+        const importPath = path.isAbsolute(resolvedPath) 
+            ? `file://${resolvedPath}`
+            : resolvedPath;
 
         for (let attempt = 1; attempt <= this.retryAttempts; attempt++) {
             try {
                 console.log(`[ModuleLoader] Attempting to import ${modulePath} (attempt ${attempt}/${this.retryAttempts}) for context: ${context}`);
-
-                const module = await this.importWithTimeout(resolvedPath, timeout);
+                console.log(`[ModuleLoader] Resolved path: ${resolvedPath}`);
+                console.log(`[ModuleLoader] Import path: ${importPath}`);
+                
+                // Validate module before import
+                await this.validateModule(resolvedPath);
+                
+                // Create timeout promise
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error(`Import timeout after ${timeout}ms`)), timeout);
+                });
+                
+                // Import with timeout using absolute file:// URL
+                const importPromise = import(importPath);
+                const module = await Promise.race([importPromise, timeoutPromise]);
 
                 // Cache successful import
                 this.moduleCache.set(modulePath, module);
@@ -103,6 +225,7 @@ export class ModuleLoader {
 
     /**
      * Resolve module path with different strategies
+     * Now uses project root for consistent resolution regardless of working directory
      */
     resolvePath(modulePath) {
         // If already absolute or starts with protocol, return as-is
@@ -115,24 +238,34 @@ export class ModuleLoader {
             return path.resolve(this.baseDir, modulePath);
         }
 
-        // Try different resolution strategies
+        // Try different resolution strategies, prioritizing project-root-based paths
+        // Always use project root to avoid working directory issues
         const strategies = [
-            // Relative to current directory
+            // Relative to project root + src/organize (most reliable for organize modules)
+            path.resolve(this.projectRoot, 'src', 'organize', modulePath),
+            path.resolve(this.projectRoot, 'src', 'organize', `${modulePath}.js`),
+            // Relative to project root for other modules
+            path.resolve(this.projectRoot, 'src', modulePath),
+            path.resolve(this.projectRoot, 'src', `${modulePath}.js`),
+            // Only use baseDir if it's actually the organize directory (not when cwd is wrong)
+            ...(this.baseDir.endsWith('src/organize') ? [
+                path.resolve(this.baseDir, modulePath),
+                path.resolve(this.baseDir, `${modulePath}.js`)
+            ] : []),
+            // Fallback to current directory (less reliable)
             path.resolve(process.cwd(), modulePath),
-            // Relative to base directory
-            path.resolve(this.baseDir, modulePath),
-            // Relative to project root (assuming base is in src/organize)
-            path.resolve(this.baseDir, '../../', modulePath),
             // As-is (for node_modules)
             modulePath
         ];
 
         for (const strategy of strategies) {
             try {
-                // For file paths, check if file exists
+                // For file paths, check if file exists using ES module compatible fs
                 if (strategy.endsWith('.js') || strategy.endsWith('.mjs')) {
-                    require('fs').accessSync(strategy);
+                    accessSync(strategy, fsConstants.F_OK);
+                    return strategy;
                 }
+                // For non-JS paths, return as-is
                 return strategy;
             } catch (error) {
                 // Continue to next strategy

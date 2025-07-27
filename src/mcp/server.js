@@ -7,6 +7,7 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+
 import {
   CallToolRequestSchema,
   ListResourcesRequestSchema,
@@ -14,12 +15,12 @@ import {
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { promises as fs } from 'fs';
+import { promises as fs, existsSync } from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import os from 'os';
 import { createErrorHandler, ErrorTypes, EnhancedError } from '../organize/error_handler.js';
-import { ContentConsolidator } from '../organize/content_consolidator.js';
+
 // Dynamic imports will be handled by ModuleLoader
 
 export class DocumentOrganizationServer {
@@ -30,7 +31,10 @@ export class DocumentOrganizationServer {
         version: '1.0.0',
       },
       {
-        capabilities: {},
+        capabilities: {
+          tools: {},
+          resources: {}
+        },
       }
     );
 
@@ -54,35 +58,88 @@ export class DocumentOrganizationServer {
     this.logInfo = this.errorHandler.logInfo.bind(this.errorHandler);
     this.logDebug = this.errorHandler.logDebug.bind(this.errorHandler);
 
-    // Initialize paths and modules asynchronously
-    this.initializePaths().then(async () => {
-      await this.runStartupValidation();
-      await this.loadModules();
-      this.setupToolHandlers();
-      this.setupResourceHandlers();
-      await this.logInfo('MCP Server initialization completed successfully');
-    }).catch(async (error) => {
-      const errorInfo = await this.errorHandler.handleError(error, {
-        operation: 'serverInitialization'
-      });
-
-      // Continue with fallback values if configuration fails
-      this.setupToolHandlers();
-      this.setupResourceHandlers();
-      await this.logWarn('Server initialized with fallback configuration', {
-        fallbackReason: error.message,
-        recoveryStrategy: errorInfo.strategy.action
-      });
-    });
+    // Register handlers immediately so MCP methods are always available
+    this.setupToolHandlers();
+    this.setupResourceHandlers();
+    // Initialization is now handled by the async initialize() method
   }
 
   /**
-   * Detect project root by looking for config directory
+   * Detect project root using robust detection logic
+   * NEVER uses process.cwd() which can vary based on execution context
    */
   detectProjectRoot() {
-    // Return current working directory as project root
-    // The actual config validation will be done asynchronously in initializePaths()
-    return process.cwd();
+    // Strategy 1: Use this file's location (most reliable)
+    if (import.meta.url) {
+      try {
+        const currentFileDir = path.dirname(new URL(import.meta.url).pathname);
+        // Navigate up from src/mcp to project root
+        const potentialRoot = path.resolve(currentFileDir, '../../');
+        if (this.isProjectRoot(potentialRoot)) {
+          console.log(`[MCPServer] Detected project root via import.meta.url: ${potentialRoot}`);
+          return potentialRoot;
+        }
+      } catch (error) {
+        console.warn(`[MCPServer] import.meta.url detection failed: ${error.message}`);
+      }
+    }
+    
+    // Strategy 2: Known absolute path (most reliable fallback)
+    const knownProjectPath = '/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync';
+    if (this.isProjectRoot(knownProjectPath)) {
+      console.log(`[MCPServer] Using known absolute path: ${knownProjectPath}`);
+      return knownProjectPath;
+    }
+    
+    // Strategy 3: Comprehensive fallback strategies (NEVER allow system root)
+    const fallbacks = [
+      '/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync',
+      path.join(os.homedir(), 'Downloads/Programming/CascadeProjects/Drive_sync'),
+      path.join(os.homedir(), 'Downloads/Drive_sync'),
+      path.join(os.homedir(), 'Drive_sync')
+    ];
+    
+    console.warn(`[MCPServer] All detection strategies failed, trying fallbacks...`);
+    
+    for (const fallback of fallbacks) {
+      if (this.isProjectRoot(fallback)) {
+        console.log(`[MCPServer] Using fallback: ${fallback}`);
+        return fallback;
+      }
+    }
+    
+    // CRITICAL: Never return system root - use first known good path
+    const safeFallback = fallbacks[0];
+    console.error(`[MCPServer] CRITICAL: All fallbacks failed, using safe default: ${safeFallback}`);
+    return safeFallback;
+  }
+  
+  /**
+   * Check if a directory is likely the project root
+   */
+  isProjectRoot(dirPath) {
+    try {
+      // Primary indicators (any one of these is sufficient)
+      const primaryIndicators = [
+        path.join(dirPath, 'package.json'),
+        path.join(dirPath, '.git'),
+        path.join(dirPath, 'config', 'config.env')
+      ];
+      
+      for (const indicator of primaryIndicators) {
+        if (existsSync(indicator)) {
+          return true;
+        }
+      }
+      
+      // Secondary indicators (need multiple)
+      const srcExists = existsSync(path.join(dirPath, 'src'));
+      const organizeExists = existsSync(path.join(dirPath, 'src', 'organize'));
+      
+      return srcExists && organizeExists;
+    } catch (error) {
+      return false;
+    }
   }
 
   /**
@@ -94,10 +151,10 @@ export class DocumentOrganizationServer {
 
       // Check if startup validator exists
       const validatorPath = path.join(this.projectRoot, 'src', 'organize', 'startup_validator.js');
-      
+
       try {
         await fs.access(validatorPath);
-        
+
         // Import and run validation
         const validatorModule = await import(`file://${validatorPath}`);
         const result = await validatorModule.runStartupValidation({
@@ -268,6 +325,26 @@ export class DocumentOrganizationServer {
     });
   }
 
+  /**
+   * Asynchronous initialization of the server.
+   * This must be called before run().
+   */
+  async initialize() {
+    try {
+      await this.initializePaths();
+      await this.runStartupValidation();
+      await this.loadModules();
+      await this.logInfo('MCP Server initialization completed successfully');
+    } catch (error) {
+      const errorInfo = await this.errorHandler.handleError(error, {
+        operation: 'serverInitialization'
+      });
+      await this.logWarn('Server initialized with fallback configuration', {
+        fallbackReason: error.message,
+        recoveryStrategy: errorInfo.strategy.action
+      });
+    }
+  }
 
 
   /**
@@ -819,7 +896,7 @@ export class DocumentOrganizationServer {
     try {
       let searchPath = this.syncHub;
       if (category) {
-        searchPath = path.join(this.syncHub, category);
+        searchPath = path.isAbsolute(category) ? category : path.join(this.syncHub, category);
 
         // Verify category exists
         try {
@@ -975,7 +1052,7 @@ export class DocumentOrganizationServer {
     const { file_path } = args;
 
     try {
-      const fullPath = path.join(this.syncHub, file_path);
+      const fullPath = path.isAbsolute(file_path) ? file_path : path.join(this.syncHub, file_path);
 
       // Check if file exists and is accessible
       try {
@@ -1315,11 +1392,33 @@ export class DocumentOrganizationServer {
 
       const results = new Map();
 
+      // If file_paths is a single directory, recursively collect all files
+      const allFiles = [];
       for (const filePath of file_paths) {
-        const fullPath = path.join(this.syncHub, filePath);
-        const analysis = await analyzer.analyzeContent(fullPath);
+        const fullPath = path.isAbsolute(filePath) ? filePath : path.join(this.syncHub, filePath);
+        const stat = await fs.stat(fullPath);
+        if (stat.isDirectory()) {
+          async function walk(dir) {
+            const entries = await fs.readdir(dir, { withFileTypes: true });
+            for (const entry of entries) {
+              const entryPath = path.join(dir, entry.name);
+              if (entry.isDirectory() && !entry.name.startsWith('.')) {
+                await walk(entryPath);
+              } else if (entry.isFile() && !entry.name.startsWith('.')) {
+                allFiles.push(entryPath);
+              }
+            }
+          }
+          await walk(fullPath);
+        } else if (stat.isFile()) {
+          allFiles.push(fullPath);
+        }
+      }
+      for (const file of allFiles) {
+        const relPath = path.relative(this.syncHub, file);
+        const analysis = await analyzer.analyzeContent(file);
         if (analysis) {
-          results.set(filePath, analysis);
+          results.set(relPath, analysis);
         }
       }
 
@@ -1347,17 +1446,25 @@ export class DocumentOrganizationServer {
     try {
       const { directory, similarity_threshold = 0.8 } = args;
 
-      const fullDirectoryPath = path.join(this.syncHub, directory);
+      // If directory is absolute, use as-is; if relative, join with syncHub
+      const fullDirectoryPath = path.isAbsolute(directory)
+        ? directory
+        : path.join(this.syncHub, directory);
 
-      // Get all files in directory
+      // Recursively get all files in directory and subdirectories
       const files = [];
-      const entries = await fs.readdir(fullDirectoryPath, { withFileTypes: true });
-
-      for (const entry of entries) {
-        if (entry.isFile() && !entry.name.startsWith('.')) {
-          files.push(path.join(fullDirectoryPath, entry.name));
+      async function walk(dir) {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory() && !entry.name.startsWith('.')) {
+            await walk(fullPath);
+          } else if (entry.isFile() && !entry.name.startsWith('.')) {
+            files.push(fullPath);
+          }
         }
       }
+      await walk(fullDirectoryPath);
 
       // Import and use ContentAnalyzer
       const { ContentAnalyzer } = await import('../organize/content_analyzer.js');
@@ -1407,7 +1514,7 @@ export class DocumentOrganizationServer {
         const consolidationCandidate = {
           topic,
           files: file_paths.map(filePath => ({
-            filePath: path.join(this.syncHub, filePath),
+            filePath: path.isAbsolute(filePath) ? filePath : path.join(this.syncHub, filePath),
             analysis: {
               topics: [topic],
               metadata: {
@@ -1453,19 +1560,23 @@ export class DocumentOrganizationServer {
       let ContentAnalyzer, ContentConsolidator;
 
       try {
+        // Robustly import ContentAnalyzer
+        let analyzerModule;
         if (this.modules.ContentAnalyzer) {
-          ContentAnalyzer = this.modules.ContentAnalyzer.ContentAnalyzer;
+          analyzerModule = this.modules.ContentAnalyzer;
         } else {
-          const module = await this.moduleLoader.safeImport('../organize/content_analyzer.js', { required: false });
-          ContentAnalyzer = module?.ContentAnalyzer;
+          analyzerModule = await this.moduleLoader.safeImport('../organize/content_analyzer.js', { required: false });
         }
+        ContentAnalyzer = analyzerModule?.ContentAnalyzer || analyzerModule?.default;
 
+        // Robustly import ContentConsolidator
+        let consolidatorModule;
         if (this.modules.ContentConsolidator) {
-          ContentConsolidator = this.modules.ContentConsolidator.ContentConsolidator;
+          consolidatorModule = this.modules.ContentConsolidator;
         } else {
-          const module = await this.moduleLoader.safeImport('../organize/content_consolidator.js', { required: false });
-          ContentConsolidator = module?.ContentConsolidator;
+          consolidatorModule = await this.moduleLoader.safeImport('../organize/content_consolidator.js', { required: false });
         }
+        ContentConsolidator = consolidatorModule?.ContentConsolidator || consolidatorModule?.default;
       } catch (importError) {
         await this.logError('Failed to import required modules for consolidation', {}, importError);
         throw new Error('Content consolidation modules not available');
@@ -1479,7 +1590,7 @@ export class DocumentOrganizationServer {
       const analyzedFiles = [];
 
       for (const filePath of file_paths) {
-        const fullPath = path.join(this.syncHub, filePath);
+        const fullPath = path.isAbsolute(filePath) ? filePath : path.join(this.syncHub, filePath);
 
         try {
           // Check if file exists first
@@ -1507,14 +1618,36 @@ export class DocumentOrganizationServer {
           }
         } catch (fileError) {
           await this.logError(`Failed to read file for consolidation: ${filePath}`, { filePath }, fileError);
-          // Skip files that can't be read
+          // Add file to error list but continue processing
+          analyzedFiles.push({
+            filePath: fullPath,
+            error: fileError.message,
+            analysis: null
+          });
           continue;
         }
       }
 
-      if (analyzedFiles.length === 0) {
-        throw new Error('No valid files found to consolidate');
+      const validFiles = analyzedFiles.filter(f => f.analysis !== null);
+      if (validFiles.length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: false,
+                message: `No accessible files found for consolidation. Checked ${file_paths.length} files.`,
+                errors: analyzedFiles.filter(f => f.error).map(f => ({ file: f.filePath, error: f.error })),
+                file_paths_requested: file_paths,
+                timestamp: new Date().toISOString()
+              }, null, 2)
+            }
+          ]
+        };
       }
+
+      // Use only valid files for consolidation
+      const validAnalyzedFiles = validFiles;
 
       const consolidator = new ContentConsolidator({
         projectRoot: this.projectRoot,
@@ -1563,7 +1696,7 @@ export class DocumentOrganizationServer {
   async suggestCategories(args) {
     try {
       const { directory } = args;
-      const fullDirectoryPath = path.join(this.syncHub, directory);
+      const fullDirectoryPath = path.isAbsolute(directory) ? directory : path.join(this.syncHub, directory);
 
       // Check if directory exists
       try {
@@ -1598,28 +1731,32 @@ export class DocumentOrganizationServer {
       const { ContentAnalyzer } = await import('../organize/content_analyzer.js');
       const analyzer = new ContentAnalyzer();
 
-      // Analyze files for poorly matched content
+      // Recursively analyze files for poorly matched content
       const allFiles = [];
-      const entries = await fs.readdir(fullDirectoryPath, { withFileTypes: true });
-
-      for (const entry of entries) {
-        if (entry.isFile() && !entry.name.startsWith('.')) {
-          const filePath = path.join(fullDirectoryPath, entry.name);
-          try {
-            const analysis = await analyzer.analyzeContent(filePath);
-            if (analysis) {
-              const match = manager.findBestCategoryMatch(analysis);
-              allFiles.push({ filePath, analysis, match });
+      async function walk(dir) {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const filePath = path.join(dir, entry.name);
+          if (entry.isDirectory() && !entry.name.startsWith('.')) {
+            await walk(filePath);
+          } else if (entry.isFile() && !entry.name.startsWith('.')) {
+            try {
+              const analysis = await analyzer.analyzeContent(filePath);
+              if (analysis) {
+                const match = manager.findBestCategoryMatch(analysis);
+                allFiles.push({ filePath, analysis, match });
+              }
+            } catch (fileError) {
+              await this.logError(`Error analyzing file for category suggestion: ${entry.name}`, {
+                fileName: entry.name,
+                directory
+              }, fileError);
+              continue;
             }
-          } catch (fileError) {
-            await this.logError(`Error analyzing file for category suggestion: ${entry.name}`, {
-              fileName: entry.name,
-              directory
-            }, fileError);
-            continue;
           }
         }
       }
+      await walk(fullDirectoryPath);
 
       const poorlyMatched = allFiles.filter(f => f.match && f.match.confidence < 0.5);
 
@@ -1701,26 +1838,18 @@ export class DocumentOrganizationServer {
     try {
       const { content, topic = 'General', enhancement_type = 'comprehensive' } = args;
 
-
-      const consolidator = new ContentConsolidator({
-        projectRoot: this.projectRoot,
-        syncHubPath: this.syncHub, // Use configured sync hub path
-        enhanceContent: true,
-        aiService: 'local'
-      });
-
-      const enhancedContent = await consolidator.enhanceContentWithAI(content, topic);
-
+      // Instead of using a local AI model, return a message for the MCP client to enhance
       return {
         content: [
           {
             type: 'text',
             text: JSON.stringify({
               original_content: content.substring(0, 200) + (content.length > 200 ? '...' : ''),
-              enhanced_content: enhancedContent,
+              enhanced_content: null,
               topic,
               enhancement_type,
-              success: enhancedContent !== content,
+              success: false,
+              message: 'AI enhancement should be performed by the MCP client. No local AI model was used.',
               timestamp: new Date().toISOString()
             }, null, 2)
           }
@@ -1734,7 +1863,7 @@ export class DocumentOrganizationServer {
   async deleteDocument(args) {
     const { file_path } = args;
     try {
-      const fullPath = path.join(this.syncHub, file_path);
+      const fullPath = path.isAbsolute(file_path) ? file_path : path.join(this.syncHub, file_path);
       await fs.unlink(fullPath);
       return {
         content: [
@@ -1755,7 +1884,7 @@ export class DocumentOrganizationServer {
   async renameDocument(args) {
     const { old_file_path, new_file_name } = args;
     try {
-      const oldFullPath = path.join(this.syncHub, old_file_path);
+      const oldFullPath = path.isAbsolute(old_file_path) ? old_file_path : path.join(this.syncHub, old_file_path);
       const newFullPath = path.join(path.dirname(oldFullPath), new_file_name);
       await fs.rename(oldFullPath, newFullPath);
       return {
@@ -1776,79 +1905,300 @@ export class DocumentOrganizationServer {
     }
   }
 
-  async moveDocument(args) {
-    const { file_path, new_category } = args;
-    try {
-      const oldFullPath = path.join(this.syncHub, file_path);
-      const newCategoryPath = path.join(this.syncHub, new_category);
-      await fs.mkdir(newCategoryPath, { recursive: true }); // Ensure target category exists
-      const newFullPath = path.join(newCategoryPath, path.basename(file_path));
-      await fs.rename(oldFullPath, newFullPath);
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({
-              success: true,
-              old_path: file_path,
-              new_path: path.relative(this.syncHub, newFullPath),
-              message: `Document ${file_path} moved to ${new_category} successfully.`
-            }, null, 2)
-          }
-        ]
-      };
-    } catch (error) {
-      throw new Error(`Failed to move document ${file_path} to ${new_category}: ${error.message}`);
-    }
-  }
-
   async listFilesInCategory(args) {
-    const { category } = args;
     try {
+      const { category } = args;
+      
+      if (!category || typeof category !== 'string') {
+        throw new Error('Category is required and must be a string');
+      }
+
       const categoryPath = path.join(this.syncHub, category);
-      const files = await fs.readdir(categoryPath, { withFileTypes: true });
-      const fileList = files
-        .filter(dirent => dirent.isFile() && !dirent.name.startsWith('.'))
-        .map(dirent => ({
-          name: dirent.name,
-          path: path.join(category, dirent.name)
-        }));
+      
+      try {
+        await fs.access(categoryPath);
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                category,
+                files: [],
+                total_files: 0,
+                message: `Category '${category}' does not exist or is empty`,
+                timestamp: new Date().toISOString()
+              }, null, 2)
+            }
+          ]
+        };
+      }
+
+      const files = [];
+      
+      async function walk(dir) {
+        const entries = await fs.readdir(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          const entryPath = path.join(dir, entry.name);
+          if (entry.isDirectory() && !entry.name.startsWith('.') && !entry.name.startsWith('_')) {
+            await walk(entryPath);
+          } else if (entry.isFile() && !entry.name.startsWith('.') && !entry.name.startsWith('_')) {
+            const stat = await fs.stat(entryPath);
+            const relativePath = path.relative(this.syncHub, entryPath);
+            files.push({
+              name: entry.name,
+              path: relativePath,
+              size: stat.size,
+              modified: stat.mtime.toISOString(),
+              extension: path.extname(entry.name)
+            });
+          }
+        }
+      }
+      
+      await walk(categoryPath);
+      
       return {
         content: [
           {
             type: 'text',
             text: JSON.stringify({
               category,
-              file_count: fileList.length,
-              files: fileList
+              files: files.sort((a, b) => a.name.localeCompare(b.name)),
+              total_files: files.length,
+              category_path: categoryPath,
+              timestamp: new Date().toISOString()
             }, null, 2)
           }
         ]
       };
     } catch (error) {
-      throw new Error(`Failed to list files in category ${category}: ${error.message}`);
+      throw new Error(`Failed to list files in category: ${error.message}`);
     }
   }
 
+  async moveDocument(args) {
+    try {
+      const { file_path, file_paths, new_category, topic = 'General', strategy = 'move', enhance_with_ai = false, dry_run = false } = args;
+      
+      // Handle both single file_path and multiple file_paths parameters
+      let filePaths = [];
+      if (file_path) {
+        filePaths = [file_path];
+      } else if (file_paths && Array.isArray(file_paths)) {
+        filePaths = file_paths;
+      } else if (file_paths && typeof file_paths === 'string') {
+        filePaths = [file_paths];
+      } else {
+        throw new Error('Either file_path or file_paths parameter is required');
+      }
+      
+      // If new_category is provided, handle simple move operation
+      if (new_category) {
+        const results = [];
+        for (const filePath of filePaths) {
+          try {
+            const oldFullPath = path.isAbsolute(filePath) ? filePath : path.join(this.syncHub, filePath);
+            const newCategoryPath = path.join(this.syncHub, new_category);
+            
+            // Ensure new category directory exists
+            await fs.mkdir(newCategoryPath, { recursive: true });
+            
+            const fileName = path.basename(oldFullPath);
+            const newFullPath = path.join(newCategoryPath, fileName);
+            
+            if (!dry_run) {
+              await fs.rename(oldFullPath, newFullPath);
+            }
+            
+            results.push({
+              old_path: filePath,
+              new_path: path.relative(this.syncHub, newFullPath),
+              category: new_category,
+              moved: !dry_run
+            });
+          } catch (moveError) {
+            results.push({
+              old_path: filePath,
+              error: moveError.message,
+              moved: false
+            });
+          }
+        }
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: results.every(r => r.moved !== false),
+                results,
+                new_category,
+                dry_run,
+                message: `${dry_run ? 'Simulated' : 'Completed'} move of ${results.length} file(s) to ${new_category}`,
+                timestamp: new Date().toISOString()
+              }, null, 2)
+            }
+          ]
+        };
+      }
+
+      // Robustly import ContentAnalyzer and ContentConsolidator
+      let ContentAnalyzer, ContentConsolidator;
+      try {
+        const analyzerModule = this.modules.ContentAnalyzer || await this.moduleLoader.safeImport('../organize/content_analyzer.js', { required: false });
+        ContentAnalyzer = analyzerModule?.ContentAnalyzer || analyzerModule?.default;
+        const consolidatorModule = this.modules.ContentConsolidator || await this.moduleLoader.safeImport('../organize/content_consolidator.js', { required: false });
+        ContentConsolidator = consolidatorModule?.ContentConsolidator || consolidatorModule?.default;
+      } catch (importError) {
+        await this.logError('Failed to import required modules for moveDocument', {}, importError);
+        throw new Error('Content move modules not available');
+      }
+
+      if (!ContentAnalyzer || !ContentConsolidator) {
+        throw new Error('Required modules for content move are not available');
+      }
+
+      const analyzer = new ContentAnalyzer();
+      const analyzedFiles = [];
+
+      for (const filePath of file_paths) {
+        const fullPath = path.isAbsolute(filePath) ? filePath : path.join(this.syncHub, filePath);
+        try {
+          await fs.access(fullPath);
+          const analysis = await analyzer.analyzeContent(fullPath);
+          if (analysis) {
+            analyzedFiles.push({ filePath: fullPath, analysis });
+          } else {
+            const content = await fs.readFile(fullPath, 'utf8');
+            analyzedFiles.push({
+              filePath: fullPath,
+              analysis: {
+                metadata: {
+                  suggestedTitle: path.basename(filePath, path.extname(filePath)),
+                  wordCount: content.split(/\s+/).length,
+                  readingTime: Math.ceil(content.split(/\s+/).length / 200)
+                },
+                content: content
+              }
+            });
+          }
+        } catch (fileError) {
+          await this.logError(`Failed to read file for move: ${filePath}`, { filePath }, fileError);
+          continue;
+        }
+      }
+
+      if (analyzedFiles.length === 0) {
+        throw new Error('No valid files found to move');
+      }
+
+      if (enhance_with_ai) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                consolidation_result: null,
+                topic,
+                files_consolidated: analyzedFiles.length,
+                files_requested: filePaths.length,
+                enhance_with_ai: true,
+                message: 'AI-based consolidation/enhancement should be performed by the MCP client. No local AI model was used.',
+                timestamp: new Date().toISOString()
+              }, null, 2)
+            }
+          ]
+        };
+      }
+
+      const consolidator = new ContentConsolidator({
+        projectRoot: this.projectRoot,
+        syncHubPath: this.syncHub,
+        enhanceContent: false,
+        aiService: 'none',
+        dryRun: dry_run
+      });
+
+      const consolidationCandidate = {
+        topic,
+        files: analyzedFiles,
+        recommendedTitle: `${topic} - Moved`,
+        consolidationStrategy: strategy
+      };
+
+      const result = await consolidator.consolidateDocuments(consolidationCandidate);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              consolidation_result: {
+                success: result.success,
+                target_folder: result.targetFolder,
+                consolidated_document: result.consolidatedDocument,
+                original_files: filePaths,
+                strategy_used: result.consolidationStrategy,
+                dry_run: dry_run
+              },
+              topic,
+              files_consolidated: analyzedFiles.length,
+              files_requested: filePaths.length,
+              timestamp: new Date().toISOString()
+            }, null, 2)
+          }
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Move document failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Start the MCP server
+   */
   async run() {
     try {
+      await this.logInfo('Starting MCP server...');
+      
+      // Create proper stdio transport for MCP client discovery
       const transport = new StdioServerTransport();
+      
+      // Start the server with proper stdio transport
       await this.server.connect(transport);
-      await this.logInfo('Enhanced Document Organization MCP Server started successfully', {
-        projectRoot: this.projectRoot,
-        syncHub: this.syncHub,
-        configLoaded: this.configLoaded
+      
+      await this.logInfo('MCP server is running and ready to accept connections');
+      
+      // Keep the process alive
+      process.on('SIGINT', async () => {
+        await this.logInfo('Received SIGINT, shutting down MCP server...');
+        await this.server.close();
+        process.exit(0);
       });
+      
+      process.on('SIGTERM', async () => {
+        await this.logInfo('Received SIGTERM, shutting down MCP server...');
+        await this.server.close();
+        process.exit(0);
+      });
+      
     } catch (error) {
-      await this.logError('Failed to start MCP Server', {}, error);
+      await this.logError('Failed to start MCP server', {}, error);
       throw error;
     }
   }
 }
-
-const docOrgServer = new DocumentOrganizationServer();
-
-docOrgServer.run().catch(async (err) => {
-  await docOrgServer.logError('Server startup error', {}, err);
-  throw new Error(`Server startup failed: ${err.message}`);
-});
+// Entrypoint: start the server if this file is run directly
+// ES module equivalent of require.main === module
+if (import.meta.url === `file://${process.argv[1]}`) {
+  (async () => {
+    const server = new DocumentOrganizationServer();
+    await server.initialize();
+    await server.run();
+  })().catch((err) => {
+    // Fallback logging if errorHandler is not available
+    console.error('Server startup error', err);
+    process.exit(1);
+  });
+}

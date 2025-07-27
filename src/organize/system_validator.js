@@ -5,7 +5,7 @@
  * Validates system dependencies, configuration, and paths before system startup
  */
 
-import { promises as fs } from 'fs';
+import { promises as fs, existsSync } from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import os from 'os';
@@ -52,25 +52,81 @@ export class SystemValidator {
     }
 
     /**
-     * Detect project root directory
+     * Detect project root directory using robust detection logic
+     * NEVER uses process.cwd() which can vary based on execution context
      */
     detectProjectRoot() {
-        let currentDir = process.cwd();
-        const maxDepth = 5;
-
-        for (let i = 0; i < maxDepth; i++) {
-            const configPath = path.join(currentDir, 'config', 'config.env');
+        // Strategy 1: Use this file's location (most reliable)
+        if (import.meta.url) {
             try {
-                require('fs').accessSync(configPath);
-                return currentDir;
+                const currentFileDir = path.dirname(new URL(import.meta.url).pathname);
+                // Navigate up from src/organize to project root
+                const potentialRoot = path.resolve(currentFileDir, '../../');
+                if (this.isProjectRoot(potentialRoot)) {
+                    console.log(`[SystemValidator] Detected project root via import.meta.url: ${potentialRoot}`);
+                    return potentialRoot;
+                }
             } catch (error) {
-                const parentDir = path.dirname(currentDir);
-                if (parentDir === currentDir) break;
-                currentDir = parentDir;
+                console.warn(`[SystemValidator] import.meta.url detection failed: ${error.message}`);
             }
         }
-
-        return process.cwd();
+        
+        // Strategy 2: Known absolute path (most reliable fallback)
+        const knownProjectPath = '/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync';
+        if (this.isProjectRoot(knownProjectPath)) {
+            console.log(`[SystemValidator] Using known absolute path: ${knownProjectPath}`);
+            return knownProjectPath;
+        }
+        
+        // Strategy 3: Comprehensive fallback strategies (NEVER allow system root)
+        const fallbacks = [
+            '/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync',
+            path.join(os.homedir(), 'Downloads/Programming/CascadeProjects/Drive_sync'),
+            path.join(os.homedir(), 'Downloads/Drive_sync'),
+            path.join(os.homedir(), 'Drive_sync')
+        ];
+        
+        console.warn(`[SystemValidator] All detection strategies failed, trying fallbacks...`);
+        
+        for (const fallback of fallbacks) {
+            if (this.isProjectRoot(fallback)) {
+                console.log(`[SystemValidator] Using fallback: ${fallback}`);
+                return fallback;
+            }
+        }
+        
+        // CRITICAL: Never return system root - use first known good path
+        const safeFallback = fallbacks[0];
+        console.error(`[SystemValidator] CRITICAL: All fallbacks failed, using safe default: ${safeFallback}`);
+        return safeFallback;
+    }
+    
+    /**
+     * Check if a directory is likely the project root
+     */
+    isProjectRoot(dirPath) {
+        try {
+            // Primary indicators (any one of these is sufficient)
+            const primaryIndicators = [
+                path.join(dirPath, 'package.json'),
+                path.join(dirPath, '.git'),
+                path.join(dirPath, 'config', 'config.env')
+            ];
+            
+            for (const indicator of primaryIndicators) {
+                if (existsSync(indicator)) {
+                    return true;
+                }
+            }
+            
+            // Secondary indicators (need multiple)
+            const srcExists = existsSync(path.join(dirPath, 'src'));
+            const organizeExists = existsSync(path.join(dirPath, 'src', 'organize'));
+            
+            return srcExists && organizeExists;
+        } catch (error) {
+            return false;
+        }
     }
 
     /**
