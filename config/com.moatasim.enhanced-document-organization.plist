@@ -10,6 +10,8 @@
         <string>/bin/bash</string>
         <string>/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync/drive_sync.sh</string>
         <string>all</string>
+        <string>--config</string>
+        <string>/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync/config/config.env</string>
     </array>
     
     <!-- Run every hour (3600 seconds) -->

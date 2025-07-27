@@ -326,9 +326,14 @@ export class CategoryManager {
      * Create category folder structure
      */
     async createCategoryFolder(category) {
+
         if (!this.projectRoot) return;
 
-        const categoryPath = path.join(this.projectRoot, 'Sync_Hub_New', category.name);
+
+        const syncHub = process.env.SYNC_HUB || path.join(this.projectRoot, 'Sync_Hub_New');
+        // Remove emoji from category name for folder creation
+        const folderName = category.name.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '').replace(/\s+/g, ' ').trim();
+        const categoryPath = path.join(syncHub, folderName);
 
         try {
             await fs.mkdir(categoryPath, { recursive: true });
@@ -374,9 +379,10 @@ ${category.filePatterns.map(p => `- ${p}`).join('\n')}
      * Update category statistics
      */
     async updateCategoryStats() {
+
         if (!this.projectRoot) return;
 
-        const syncHub = path.join(this.projectRoot, 'Sync_Hub_New');
+        const syncHub = process.env.SYNC_HUB || path.join(this.projectRoot, 'Sync_Hub_New');
 
         try {
             const entries = await fs.readdir(syncHub, { withFileTypes: true });

@@ -620,7 +620,7 @@ process_consolidation_candidates() {
                                 console.log(\`Consolidating topic: \${topic}\`);
                                 try {
                                     const result = await processor.consolidateContent(candidate, {
-                                        syncHubPath: '$SYNC_HUB',
+                                        syncHubPath: process.env.SYNC_HUB,
                                         aiService: '$ENABLE_AI_ENHANCEMENT' === 'true' ? 'local' : 'none',
                                         enhanceContent: '$ENABLE_AI_ENHANCEMENT' === 'true',
                                         dryRun: isDryRun

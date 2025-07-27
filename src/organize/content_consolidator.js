@@ -171,12 +171,14 @@ export class ContentConsolidator {
     async createConsolidatedFolder(folderName, sampleAnalysis) {
         return await this.errorHandler.wrapAsync(async () => {
             const category = this.determineCategory(sampleAnalysis);
+            // Remove emoji from category name for folder creation
+            const folderNameNoEmoji = category.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '').replace(/\s+/g, ' ').trim();
             const sanitizedFolderName = this.sanitizeFolderName(folderName);
             // Ensure syncHubPath is absolute
-            const absoluteSyncHubPath = path.isAbsolute(this.syncHubPath) 
-                ? this.syncHubPath 
+            const absoluteSyncHubPath = path.isAbsolute(this.syncHubPath)
+                ? this.syncHubPath
                 : path.resolve(this.syncHubPath);
-            const categoryPath = path.join(absoluteSyncHubPath, category);
+            const categoryPath = path.join(absoluteSyncHubPath, folderNameNoEmoji);
             const folderPath = path.join(categoryPath, sanitizedFolderName);
 
             if (this.dryRun) {
@@ -556,7 +558,7 @@ Please return only the enhanced content in markdown format, without any explanat
         const fullContent = metadata + content;
 
         const docPath = path.join(targetFolder, 'main.md');
-        
+
         if (this.dryRun) {
             console.log(`[DRY RUN] Would create consolidated document: ${docPath}`);
             console.log(`[DRY RUN] Document would contain ${fullContent.length} characters`);
@@ -585,13 +587,13 @@ Please return only the enhanced content in markdown format, without any explanat
                     referencesFolder,
                     files: files.map(f => path.basename(f.filePath))
                 });
-                
+
                 // Simulate successful moves for dry run
                 for (const file of files) {
                     const fileName = path.basename(file.filePath);
                     movedFiles.push(fileName);
                 }
-                
+
                 return {
                     movedFiles,
                     failedFiles: []

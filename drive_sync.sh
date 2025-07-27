@@ -5,9 +5,22 @@
 # ============================================================================
 # Simplified main script for document sync and organization
 
+
 set -euo pipefail
 
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Debug: Log HOME and SYNC_HUB at script start
+echo "[DEBUG] HOME is: $HOME" | tee -a "$SCRIPT_DIR/logs/launchagent_env.log"
+if [[ -f "$SCRIPT_DIR/config/config.env" ]]; then
+    source "$SCRIPT_DIR/config/config.env"
+    echo "[DEBUG] SYNC_HUB after sourcing config: $SYNC_HUB" | tee -a "$SCRIPT_DIR/logs/launchagent_env.log"
+else
+    echo "❌ Configuration file not found: $SCRIPT_DIR/config/config.env" | tee -a "$SCRIPT_DIR/logs/launchagent_env.log"
+    echo "💡 Run startup validation: node src/organize/startup_validator.js" | tee -a "$SCRIPT_DIR/logs/launchagent_env.log"
+    echo "💡 Or run setup: ./setup.sh" | tee -a "$SCRIPT_DIR/logs/launchagent_env.log"
+    exit 1
+fi
 
 # Load configuration
 if [[ ! -f "$SCRIPT_DIR/config/config.env" ]]; then
@@ -95,8 +108,26 @@ run_organize() {
         return 1
     fi
     
+    # Ensure SYNC_HUB is properly set
+    if [[ -z "$SYNC_HUB" ]]; then
+        log "ERROR" "SYNC_HUB environment variable is not set"
+        return 1
+    fi
+    
+    # Resolve SYNC_HUB to actual path to prevent literal $SYNC_HUB usage
+    local sync_hub_path="$SYNC_HUB"
+    
+    # Double-check that we have an actual path, not a literal variable
+    if [[ "$sync_hub_path" == "\$SYNC_HUB" ]] || [[ "$sync_hub_path" == '$SYNC_HUB' ]]; then
+        log "ERROR" "SYNC_HUB is not properly expanded: $sync_hub_path"
+        # Fallback to config value
+        sync_hub_path="/Users/moatasimfarooque/Sync_Hub_New"
+        log "WARN" "Using fallback SYNC_HUB path: $sync_hub_path"
+    fi
+    
     local dry_run="${1:-false}"
-    "$SCRIPT_DIR/src/organize/organize_module.sh" "$SYNC_HUB" "$dry_run"
+    log "DEBUG" "Calling organize_module.sh with resolved path: $sync_hub_path"
+    "$SCRIPT_DIR/src/organize/organize_module.sh" "$sync_hub_path" "$dry_run"
 }
 
 # Start MCP server
@@ -222,8 +253,45 @@ Configuration:
 EOF
 }
 
+# Parse arguments before main execution
+parse_arguments() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --sync-hub)
+                if [[ -n "$2" && "$2" != --* ]]; then
+                    export SYNC_HUB="$2"
+                    log "DEBUG" "SYNC_HUB overridden via argument: $SYNC_HUB"
+                    shift 2
+                else
+                    log "ERROR" "--sync-hub requires a path argument"
+                    exit 1
+                fi
+                ;;
+            --config)
+                if [[ -n "$2" && "$2" != --* ]]; then
+                    # Config argument is handled elsewhere, just skip
+                    shift 2
+                else
+                    log "ERROR" "--config requires a path argument"
+                    exit 1
+                fi
+                ;;
+            *)
+                # Return remaining arguments
+                break
+                ;;
+        esac
+    done
+    # Return remaining arguments
+    echo "$@"
+}
+
 # Main execution
 main() {
+    # Parse arguments first
+    remaining_args=$(parse_arguments "$@")
+    eval set -- "$remaining_args"
+    
     case "${1:-help}" in
         "all")
             run_all "${2:-run}"
