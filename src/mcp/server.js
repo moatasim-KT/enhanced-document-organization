@@ -1646,9 +1646,6 @@ export class DocumentOrganizationServer {
         };
       }
 
-      // Use only valid files for consolidation
-      const validAnalyzedFiles = validFiles;
-
       const consolidator = new ContentConsolidator({
         projectRoot: this.projectRoot,
         syncHubPath: this.syncHub, // Use configured sync hub path
@@ -2174,13 +2171,13 @@ export class DocumentOrganizationServer {
       process.on('SIGINT', async () => {
         await this.logInfo('Received SIGINT, shutting down MCP server...');
         await this.server.close();
-        process.exit(0);
+        process.exitCode = 0;
       });
       
       process.on('SIGTERM', async () => {
         await this.logInfo('Received SIGTERM, shutting down MCP server...');
         await this.server.close();
-        process.exit(0);
+        process.exitCode = 0;
       });
       
     } catch (error) {
@@ -2199,6 +2196,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   })().catch((err) => {
     // Fallback logging if errorHandler is not available
     console.error('Server startup error', err);
-    process.exit(1);
+    throw err;
   });
 }

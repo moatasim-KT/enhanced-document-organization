@@ -144,21 +144,7 @@ export class ErrorHandler {
         console.log(`[ProjectRoot] Starting search from cwd: ${currentDir}`);
         
         const maxDepth = 10;
-        const projectIndicators = [
-            // Primary indicators (most reliable)
-            'package.json',
-            '.git',
-            'config/config.env',
-            
-            // Secondary indicators
-            'src',
-            'node_modules',
-            '.gitignore',
-            'README.md',
-            'yarn.lock',
-            'package-lock.json'
-        ];
-
+        
         // Search upward from current directory
         for (let i = 0; i < maxDepth; i++) {
             // Check if this directory has project indicators
