@@ -8,6 +8,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
+import { createErrorHandler, ErrorTypes, EnhancedError } from './error_handler.js';
 
 export class ContentConsolidator {
     constructor(options = {}) {
@@ -17,102 +18,260 @@ export class ContentConsolidator {
         this.outputFormat = options.outputFormat || 'markdown';
         this.preserveReferences = options.preserveReferences !== false;
         this.enhanceContent = options.enhanceContent !== false;
+
+        // Initialize error handler
+        this.errorHandler = createErrorHandler('ContentConsolidator', {
+            projectRoot: this.projectRoot,
+            enableConsoleLogging: process.env.NODE_ENV !== 'production'
+        });
     }
 
     /**
      * Consolidate multiple documents into a single, enhanced document
      */
     async consolidateDocuments(consolidationCandidate) {
-        const { topic, files, consolidationStrategy } = consolidationCandidate;
+        return await this.errorHandler.wrapAsync(async () => {
+            const { topic, files, consolidationStrategy } = consolidationCandidate;
 
-        console.log(`[INFO] Consolidating ${files.length} documents for topic: ${topic}`);
+            await this.errorHandler.logInfo(`Starting consolidation of ${files.length} documents`, {
+                topic,
+                fileCount: files.length,
+                strategy: consolidationStrategy,
+                operation: 'consolidateDocuments'
+            });
 
-        // Create folder structure
-        const folderName = this.sanitizeFolderName(consolidationCandidate.recommendedTitle);
-        const targetFolder = await this.createConsolidatedFolder(folderName, files[0].analysis);
+            // Validate inputs with comprehensive error context
+            if (!consolidationCandidate) {
+                throw this.errorHandler.createContextualError(
+                    'No consolidation candidate provided',
+                    ErrorTypes.VALIDATION_ERROR,
+                    { operation: 'consolidateDocuments', input: 'consolidationCandidate' }
+                );
+            }
 
-        // Extract and merge content
-        const mergedContent = await this.mergeContent(files, consolidationStrategy);
+            if (!topic || typeof topic !== 'string') {
+                throw this.errorHandler.createContextualError(
+                    'Invalid or missing topic for consolidation',
+                    ErrorTypes.VALIDATION_ERROR,
+                    { operation: 'consolidateDocuments', topic, topicType: typeof topic }
+                );
+            }
 
-        // Enhance content with AI if enabled
-        let enhancedContent = mergedContent;
-        if (this.enhanceContent) {
-            enhancedContent = await this.enhanceContentWithAI(mergedContent, topic);
-        }
+            if (!files || !Array.isArray(files) || files.length === 0) {
+                throw this.errorHandler.createContextualError(
+                    'No files provided for consolidation',
+                    ErrorTypes.VALIDATION_ERROR,
+                    {
+                        operation: 'consolidateDocuments',
+                        topic,
+                        filesProvided: !!files,
+                        filesType: typeof files,
+                        filesLength: Array.isArray(files) ? files.length : 'N/A'
+                    }
+                );
+            }
 
-        // Create the consolidated document
-        const consolidatedDoc = await this.createConsolidatedDocument(
-            enhancedContent,
-            consolidationCandidate,
-            targetFolder
-        );
+            // Validate sync hub path
+            if (!this.syncHubPath) {
+                throw this.errorHandler.createContextualError(
+                    'Sync hub path not configured',
+                    ErrorTypes.CONFIGURATION_ERROR,
+                    { operation: 'consolidateDocuments', topic, syncHubPath: this.syncHubPath }
+                );
+            }
 
-        // Move reference materials
-        await this.moveReferenceMaterials(files, targetFolder);
+            if (!this.syncHubPath) {
+                throw new EnhancedError(
+                    'syncHubPath is required but not provided',
+                    ErrorTypes.CONFIGURATION_ERROR,
+                    { operation: 'consolidateDocuments', topic }
+                );
+            }
 
-        return {
-            success: true,
-            targetFolder,
-            consolidatedDocument: consolidatedDoc,
-            originalFiles: files.map(f => f.filePath),
-            consolidationStrategy
-        };
+            // Validate file accessibility before processing
+            const validFiles = [];
+            for (const file of files) {
+                try {
+                    await fs.access(file.filePath || file, fs.constants.R_OK);
+                    validFiles.push(file);
+                } catch (error) {
+                    await this.errorHandler.logWarn('File not accessible, skipping', {
+                        filePath: file.filePath || file,
+                        error: error.message,
+                        operation: 'consolidateDocuments'
+                    });
+                }
+            }
+
+            if (validFiles.length === 0) {
+                throw this.errorHandler.createContextualError(
+                    'No accessible files found for consolidation',
+                    ErrorTypes.FILE_NOT_FOUND,
+                    { operation: 'consolidateDocuments', topic, originalFileCount: files.length }
+                );
+            }
+
+            // Create folder structure with error handling
+            const folderName = this.sanitizeFolderName(consolidationCandidate.recommendedTitle || topic);
+            const targetFolder = await this.createConsolidatedFolder(folderName, validFiles[0].analysis);
+
+            // Extract and merge content with comprehensive error handling
+            const mergedContent = await this.mergeContent(validFiles, consolidationStrategy);
+
+            // Enhance content with AI if enabled
+            let enhancedContent = mergedContent;
+            if (this.enhanceContent) {
+                try {
+                    enhancedContent = await this.enhanceContentWithAI(mergedContent, topic);
+                } catch (error) {
+                    await this.errorHandler.logWarn('AI enhancement failed, using merged content', {
+                        topic,
+                        error: error.message,
+                        operation: 'consolidateDocuments'
+                    });
+                    // Continue with unenhanced content
+                }
+            }
+
+            // Create the consolidated document
+            const consolidatedDoc = await this.createConsolidatedDocument(
+                enhancedContent,
+                consolidationCandidate,
+                targetFolder
+            );
+
+            // Move reference materials with error handling
+            await this.moveReferenceMaterials(validFiles, targetFolder);
+
+            await this.errorHandler.logInfo('Document consolidation completed successfully', {
+                topic,
+                targetFolder,
+                consolidatedDocument: consolidatedDoc
+            });
+
+            return {
+                success: true,
+                targetFolder,
+                consolidatedDocument: consolidatedDoc,
+                originalFiles: files.map(f => path.basename(f.filePath)),
+                consolidationStrategy
+            };
+        }, {
+            operation: 'consolidateDocuments',
+            topic: consolidationCandidate.topic
+        });
     }
 
     /**
      * Create folder structure for consolidated content
      */
     async createConsolidatedFolder(folderName, sampleAnalysis) {
-        const category = this.determineCategory(sampleAnalysis);
-        
-        // Use configurable syncHubPath instead of hardcoded path
-        if (!this.syncHubPath) {
-            throw new Error('syncHubPath is required but not provided in ContentConsolidator options');
-        }
-        
-        const categoryPath = path.join(this.syncHubPath, category);
-        const folderPath = path.join(categoryPath, folderName);
+        return await this.errorHandler.wrapAsync(async () => {
+            const category = this.determineCategory(sampleAnalysis);
+            const categoryPath = path.join(this.syncHubPath, category);
+            const folderPath = path.join(categoryPath, folderName);
 
-        // Create main folder
-        await fs.mkdir(folderPath, { recursive: true });
+            await this.errorHandler.logDebug('Creating consolidated folder structure', {
+                folderName,
+                category,
+                folderPath
+            });
 
-        // Create subfolders
-        await fs.mkdir(path.join(folderPath, 'assets'), { recursive: true });
-        await fs.mkdir(path.join(folderPath, 'references'), { recursive: true });
+            // Create main folder
+            await fs.mkdir(folderPath, { recursive: true });
 
-        return folderPath;
+            // Create subfolders
+            await fs.mkdir(path.join(folderPath, 'assets'), { recursive: true });
+            await fs.mkdir(path.join(folderPath, 'references'), { recursive: true });
+
+            await this.errorHandler.logInfo('Consolidated folder structure created', {
+                folderPath,
+                category
+            });
+
+            return folderPath;
+        }, {
+            operation: 'createConsolidatedFolder',
+            folderName,
+            category: this.determineCategory(sampleAnalysis)
+        });
     }
 
     /**
      * Merge content from multiple files
      */
     async mergeContent(files, strategy) {
-        const contents = [];
+        return await this.errorHandler.wrapAsync(async () => {
+            const contents = [];
+            const failedFiles = [];
 
-        for (const file of files) {
-            try {
-                const content = await fs.readFile(file.filePath, 'utf-8');
-                const processedContent = this.preprocessContent(content, file.analysis);
-                contents.push({
-                    content: processedContent,
-                    metadata: file.analysis.metadata,
-                    topics: file.analysis.topics,
-                    structure: file.analysis.structure
-                });
-            } catch (error) {
-                console.warn(`Failed to read ${file.filePath}: ${error.message}`);
+            await this.errorHandler.logDebug('Starting content merge', {
+                fileCount: files.length,
+                strategy
+            });
+
+            for (const file of files) {
+                try {
+                    const content = await fs.readFile(file.filePath, 'utf-8');
+                    const processedContent = this.preprocessContent(content, file.analysis);
+                    contents.push({
+                        content: processedContent,
+                        metadata: file.analysis.metadata,
+                        topics: file.analysis.topics,
+                        structure: file.analysis.structure
+                    });
+                } catch (error) {
+                    const errorInfo = await this.errorHandler.handleError(error, {
+                        operation: 'readFileForMerge',
+                        filePath: file.filePath
+                    });
+                    failedFiles.push({
+                        filePath: file.filePath,
+                        error: error.message
+                    });
+                }
             }
-        }
 
-        switch (strategy) {
-            case 'comprehensive_merge':
-                return this.comprehensiveMerge(contents);
-            case 'structured_consolidation':
-                return this.structuredConsolidation(contents);
-            case 'simple_merge':
-            default:
-                return this.simpleMerge(contents);
-        }
+            if (contents.length === 0) {
+                throw new EnhancedError(
+                    'No files could be read for content merging',
+                    ErrorTypes.CONTENT_PROCESSING_ERROR,
+                    { operation: 'mergeContent', failedFiles }
+                );
+            }
+
+            if (failedFiles.length > 0) {
+                await this.errorHandler.logWarn(`Failed to read ${failedFiles.length} files during merge`, {
+                    failedFiles,
+                    successfulFiles: contents.length
+                });
+            }
+
+            let mergedContent;
+            switch (strategy) {
+                case 'comprehensive_merge':
+                    mergedContent = this.comprehensiveMerge(contents);
+                    break;
+                case 'structured_consolidation':
+                    mergedContent = this.structuredConsolidation(contents);
+                    break;
+                case 'simple_merge':
+                default:
+                    mergedContent = this.simpleMerge(contents);
+            }
+
+            await this.errorHandler.logInfo('Content merge completed', {
+                strategy,
+                processedFiles: contents.length,
+                failedFiles: failedFiles.length
+            });
+
+            return mergedContent;
+        }, {
+            operation: 'mergeContent',
+            strategy,
+            fileCount: files.length
+        });
     }
 
     /**
@@ -230,15 +389,51 @@ export class ContentConsolidator {
      * Enhance content using AI
      */
     async enhanceContentWithAI(content, topic) {
-        const prompt = this.createEnhancementPrompt(content, topic);
+        return await this.errorHandler.wrapAsync(async () => {
+            await this.errorHandler.logDebug('Starting AI content enhancement', {
+                topic,
+                contentLength: content.length,
+                aiService: this.aiService
+            });
 
-        try {
-            const enhancedContent = await this.callAIService(prompt);
-            return enhancedContent || content; // Fallback to original if AI fails
-        } catch (error) {
-            console.warn(`AI enhancement failed: ${error.message}`);
-            return content;
-        }
+            const prompt = this.createEnhancementPrompt(content, topic);
+
+            try {
+                const enhancedContent = await this.callAIService(prompt);
+
+                if (enhancedContent && enhancedContent !== content) {
+                    await this.errorHandler.logInfo('AI content enhancement completed', {
+                        topic,
+                        originalLength: content.length,
+                        enhancedLength: enhancedContent.length
+                    });
+                    return enhancedContent;
+                } else {
+                    await this.errorHandler.logWarn('AI enhancement returned no improvement', { topic });
+                    return content;
+                }
+            } catch (error) {
+                const errorInfo = await this.errorHandler.handleError(error, {
+                    operation: 'aiEnhancement',
+                    topic,
+                    aiService: this.aiService
+                });
+
+                // Return original content as fallback
+                await this.errorHandler.logWarn('Using original content due to AI enhancement failure', {
+                    topic,
+                    fallbackReason: error.message
+                });
+                return content;
+            }
+        }, {
+            operation: 'enhanceContentWithAI',
+            topic,
+            aiService: this.aiService
+        }, {
+            maxRetries: 2,
+            retryDelay: 2000
+        });
     }
 
     /**
@@ -284,19 +479,44 @@ Please return only the enhanced content in markdown format, without any explanat
      * Call local AI service (e.g., Ollama)
      */
     async callLocalAI(prompt) {
-        try {
+        return await this.errorHandler.wrapAsync(async () => {
+            await this.errorHandler.logDebug('Calling local AI service', {
+                promptLength: prompt.length,
+                service: 'ollama'
+            });
+
             // Example using curl to call Ollama API
             const response = execSync(`curl -s -X POST http://localhost:11434/api/generate -d '${JSON.stringify({
                 model: "llama2",
                 prompt: prompt,
                 stream: false
-            })}'`, { encoding: 'utf-8' });
+            })}'`, {
+                encoding: 'utf-8',
+                timeout: 30000 // 30 second timeout
+            });
 
             const result = JSON.parse(response);
+
+            if (!result.response) {
+                throw new EnhancedError(
+                    'Local AI service returned empty response',
+                    ErrorTypes.NETWORK_ERROR,
+                    { operation: 'callLocalAI', service: 'ollama' }
+                );
+            }
+
+            await this.errorHandler.logDebug('Local AI service call completed', {
+                responseLength: result.response.length
+            });
+
             return result.response;
-        } catch (error) {
-            throw new Error(`Local AI service error: ${error.message}`);
-        }
+        }, {
+            operation: 'callLocalAI',
+            service: 'ollama'
+        }, {
+            maxRetries: 2,
+            retryDelay: 5000
+        });
     }
 
     /**
@@ -328,20 +548,62 @@ Please return only the enhanced content in markdown format, without any explanat
      * Move reference materials to the references folder
      */
     async moveReferenceMaterials(files, targetFolder) {
-        const referencesFolder = path.join(targetFolder, 'references');
+        return await this.errorHandler.wrapAsync(async () => {
+            const referencesFolder = path.join(targetFolder, 'references');
+            const movedFiles = [];
+            const failedFiles = [];
 
-        for (const file of files) {
-            try {
-                const fileName = path.basename(file.filePath);
-                const targetPath = path.join(referencesFolder, fileName);
+            await this.errorHandler.logDebug('Moving reference materials', {
+                fileCount: files.length,
+                referencesFolder
+            });
 
-                // Copy original file to references
-                await fs.copyFile(file.filePath, targetPath);
-                console.log(`[INFO] Moved reference: ${fileName}`);
-            } catch (error) {
-                console.warn(`Failed to move reference ${file.filePath}: ${error.message}`);
+            for (const file of files) {
+                try {
+                    const fileName = path.basename(file.filePath);
+                    const targetPath = path.join(referencesFolder, fileName);
+
+                    // Copy original file to references
+                    await fs.copyFile(file.filePath, targetPath);
+                    movedFiles.push(fileName);
+
+                    await this.errorHandler.logDebug('Reference file moved', {
+                        fileName,
+                        sourcePath: file.filePath,
+                        targetPath
+                    });
+                } catch (error) {
+                    const errorInfo = await this.errorHandler.handleError(error, {
+                        operation: 'moveReferenceFile',
+                        filePath: file.filePath
+                    });
+                    failedFiles.push({
+                        filePath: file.filePath,
+                        error: error.message
+                    });
+                }
             }
-        }
+
+            await this.errorHandler.logInfo('Reference materials processing completed', {
+                movedFiles: movedFiles.length,
+                failedFiles: failedFiles.length,
+                movedFileNames: movedFiles
+            });
+
+            if (failedFiles.length > 0) {
+                await this.errorHandler.logWarn('Some reference files could not be moved', {
+                    failedFiles
+                });
+            }
+
+            return {
+                movedFiles,
+                failedFiles
+            };
+        }, {
+            operation: 'moveReferenceMaterials',
+            targetFolder
+        });
     }
 
     /**
@@ -465,7 +727,7 @@ Please return only the enhanced content in markdown format, without any explanat
     }
 
     createDocumentMetadata(consolidationCandidate) {
-        const { recommendedTitle, files, topic, avgSimilarity } = consolidationCandidate;
+        const { recommendedTitle, files, topic, avgSimilarity = 0.0 } = consolidationCandidate;
 
         return `---
 title: "${recommendedTitle}"

@@ -18,7 +18,8 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 import os from 'os';
-import { ContentConsolidator } from '../organize/content_consolidator.js';
+import { createErrorHandler, ErrorTypes, EnhancedError } from '../organize/error_handler.js';
+// Dynamic imports will be handled by ModuleLoader
 
 export class DocumentOrganizationServer {
   constructor() {
@@ -32,48 +33,371 @@ export class DocumentOrganizationServer {
       }
     );
 
-    this.projectRoot = '/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync';
+    // Initialize with fallback values
+    this.projectRoot = this.detectProjectRoot();
     this.syncHub = path.join(os.homedir(), 'Sync_Hub_New'); // Default fallback
-    this.logFilePath = path.join(this.projectRoot, 'logs', 'mcp_server.log');
+    this.configLoaded = false;
+    this.modulesLoaded = false;
+    this.modules = {};
 
-    // Bind logError to the instance
-    this.logError = this.logError.bind(this);
+    // Initialize enhanced error handler
+    this.errorHandler = createErrorHandler('MCPServer', {
+      projectRoot: this.projectRoot,
+      enableConsoleLogging: process.env.NODE_ENV !== 'production'
+    });
 
-    // Ensure logs directory exist
-    fs.mkdir(path.dirname(this.logFilePath), { recursive: true }).catch(() => { });
+    // Bind legacy log methods for backward compatibility
+    this.logError = this.errorHandler.logError.bind(this.errorHandler);
+    this.logWarn = this.errorHandler.logWarn.bind(this.errorHandler);
+    this.logInfo = this.errorHandler.logInfo.bind(this.errorHandler);
+    this.logDebug = this.errorHandler.logDebug.bind(this.errorHandler);
 
-    // Initialize paths asynchronously
-    this.initializePaths().then(() => {
+    // Initialize paths and modules asynchronously
+    this.initializePaths().then(async () => {
+      await this.loadModules();
       this.setupToolHandlers();
       this.setupResourceHandlers();
-    }).catch(error => {
-      this.logError(`Error during server initialization: ${error.message}`);
+      await this.logInfo('MCP Server initialization completed successfully');
+    }).catch(async (error) => {
+      const errorInfo = await this.errorHandler.handleError(error, {
+        operation: 'serverInitialization'
+      });
+
+      // Continue with fallback values if configuration fails
+      this.setupToolHandlers();
+      this.setupResourceHandlers();
+      await this.logWarn('Server initialized with fallback configuration', {
+        fallbackReason: error.message,
+        recoveryStrategy: errorInfo.strategy.action
+      });
     });
   }
 
-  async initializePaths() {
-    const configEnvPath = path.join(this.projectRoot, 'config', 'config.env');
-    try {
-      const configEnvContent = await fs.readFile(configEnvPath, 'utf8');
-      const syncHubMatch = configEnvContent.match(/^SYNC_HUB="(.*?)"$/m);
-      if (syncHubMatch && syncHubMatch[1]) {
-        this.syncHub = syncHubMatch[1].replace('${HOME}', os.homedir());
+  /**
+   * Detect project root by looking for config directory
+   */
+  detectProjectRoot() {
+    // Start from current working directory and look for config directory
+    let currentDir = process.cwd();
+    const maxDepth = 5; // Prevent infinite loops
+
+    for (let i = 0; i < maxDepth; i++) {
+      const configPath = path.join(currentDir, 'config', 'config.env');
+      try {
+        // Check if config.env exists
+        require('fs').accessSync(configPath);
+        return currentDir;
+      } catch (error) {
+        // Move up one directory
+        const parentDir = path.dirname(currentDir);
+        if (parentDir === currentDir) {
+          // Reached filesystem root
+          break;
+        }
+        currentDir = parentDir;
       }
-    } catch (error) {
-      console.warn(`[WARN] Could not read config.env: ${error.message}. Using fallback for SYNC_HUB.`);
     }
-    // Ensure Sync_Hub_New exists after path initialization
-    await fs.mkdir(this.syncHub, { recursive: true }).catch(() => { });
+
+    // Fallback to current working directory
+    return process.cwd();
   }
 
-  async logError(message) {
-    const timestamp = new Date().toISOString();
-    const logMessage = `[${timestamp}] [ERROR] ${message}\n`;
-    try {
-      await fs.appendFile(this.logFilePath, logMessage);
-    } catch (err) {
-      console.error(`Failed to write to log file: ${this.logFilePath}`, err);
+  /**
+   * Load required modules with error handling
+   */
+  async loadModules() {
+    return await this.errorHandler.wrapAsync(async () => {
+      await this.logInfo('Loading required modules...');
+
+      // Import ModuleLoader
+      const moduleLoaderModule = await import('../organize/module_loader.js');
+      const ModuleLoader = moduleLoaderModule.ModuleLoader;
+
+      this.moduleLoader = new ModuleLoader({
+        baseDir: path.join(this.projectRoot, 'src', 'organize'),
+        retryAttempts: 2,
+        retryDelay: 500
+      });
+
+      // Define modules to load
+      const moduleSpecs = [
+        {
+          name: 'ContentAnalyzer',
+          path: './content_analyzer.js',
+          required: false
+        },
+        {
+          name: 'ContentConsolidator',
+          path: './content_consolidator.js',
+          required: false
+        },
+        {
+          name: 'CategoryManager',
+          path: './category_manager.js',
+          required: false
+        },
+        {
+          name: 'BatchProcessor',
+          path: './batch_processor.js',
+          required: false
+        }
+      ];
+
+      const { results, errors } = await this.moduleLoader.importModules(moduleSpecs);
+
+      // Store loaded modules
+      for (const [name, module] of results) {
+        this.modules[name] = module;
+      }
+
+      // Handle module loading errors
+      if (errors.length > 0) {
+        await this.logWarn('Some modules failed to load', {
+          errors: errors.map(e => ({ name: e.name, error: e.error })),
+          loadedCount: results.size,
+          failedCount: errors.length
+        });
+      }
+
+      this.modulesLoaded = true;
+      await this.logInfo('Module loading completed', {
+        loadedModules: Object.keys(this.modules),
+        failedModules: errors.map(e => e.name),
+        successRate: `${(results.size / (results.size + errors.length) * 100).toFixed(1)}%`
+      });
+
+    }, {
+      operation: 'loadModules'
+    }, {
+      maxRetries: 2,
+      retryDelay: 1000
+    });
+  }
+
+  /**
+   * Initialize paths from configuration with proper fallback behavior
+   */
+  async initializePaths() {
+    return await this.errorHandler.wrapAsync(async () => {
+      const configEnvPath = path.join(this.projectRoot, 'config', 'config.env');
+
+      try {
+        // Check if config file exists
+        await fs.access(configEnvPath);
+
+        const configEnvContent = await fs.readFile(configEnvPath, 'utf8');
+
+        // Parse SYNC_HUB path
+        const syncHubMatch = configEnvContent.match(/^SYNC_HUB="?(.*?)"?$/m);
+        if (syncHubMatch && syncHubMatch[1]) {
+          let syncHubPath = syncHubMatch[1].trim();
+          // Replace ${HOME} with actual home directory
+          syncHubPath = syncHubPath.replace(/\$\{HOME\}/g, os.homedir());
+          this.syncHub = syncHubPath;
+        }
+
+        this.configLoaded = true;
+        await this.logInfo('Configuration loaded successfully', {
+          configPath: configEnvPath,
+          syncHub: this.syncHub
+        });
+
+      } catch (error) {
+        const errorInfo = await this.errorHandler.handleError(error, {
+          operation: 'loadConfiguration',
+          configPath: configEnvPath
+        });
+
+        await this.logWarn('Using fallback configuration', {
+          configPath: configEnvPath,
+          fallbackSyncHub: this.syncHub,
+          reason: error.message
+        });
+
+        // Use fallback behavior
+        this.configLoaded = false;
+      }
+
+      // Ensure sync hub directory exists
+      try {
+        await fs.mkdir(this.syncHub, { recursive: true });
+        await this.logInfo('Sync hub directory ensured', {
+          syncHub: this.syncHub
+        });
+      } catch (error) {
+        throw new EnhancedError(
+          `Failed to create sync hub directory: ${this.syncHub}`,
+          ErrorTypes.PERMISSION_DENIED,
+          {
+            operation: 'createSyncHubDirectory',
+            syncHub: this.syncHub
+          },
+          error
+        );
+      }
+    }, {
+      operation: 'initializePaths'
+    });
+  }
+
+
+
+  /**
+   * Get configuration status for debugging
+   */
+  getConfigurationStatus() {
+    return {
+      projectRoot: this.projectRoot,
+      syncHub: this.syncHub,
+      configLoaded: this.configLoaded,
+      configPath: path.join(this.projectRoot, 'config', 'config.env'),
+      logFilePath: this.logFilePath
+    };
+  }
+
+  /**
+   * Generate unique request ID for tracking
+   */
+  generateRequestId() {
+    return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * Sanitize arguments for logging (remove sensitive data)
+   */
+  sanitizeArgsForLogging(args) {
+    if (!args) return {};
+
+    const sanitized = { ...args };
+
+    // Remove or truncate large content fields
+    if (sanitized.content && sanitized.content.length > 200) {
+      sanitized.content = sanitized.content.substring(0, 200) + '... [truncated]';
     }
+
+    // Remove sensitive patterns
+    const sensitiveKeys = ['password', 'token', 'key', 'secret'];
+    sensitiveKeys.forEach(key => {
+      if (sanitized[key]) {
+        sanitized[key] = '[REDACTED]';
+      }
+    });
+
+    return sanitized;
+  }
+
+  /**
+   * Format error response according to MCP protocol
+   */
+  formatErrorResponse(error, toolName, requestId) {
+    const errorInfo = {
+      error: true,
+      tool: toolName,
+      requestId,
+      message: error.message,
+      timestamp: new Date().toISOString(),
+      ...(error.code && { code: error.code }),
+      ...(error.name && { type: error.name })
+    };
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(errorInfo, null, 2)
+        }
+      ],
+      isError: true
+    };
+  }
+
+  /**
+   * Validate tool arguments against schema
+   */
+  validateToolArgs(toolName, args, schema) {
+    const errors = [];
+
+    if (!args) {
+      if (schema.required && schema.required.length > 0) {
+        errors.push(`Missing required arguments: ${schema.required.join(', ')}`);
+      }
+      return errors;
+    }
+
+    // Check required fields
+    if (schema.required) {
+      for (const field of schema.required) {
+        if (!(field in args) || args[field] === null || args[field] === undefined) {
+          errors.push(`Missing required argument: ${field}`);
+        }
+      }
+    }
+
+    // Basic type checking
+    if (schema.properties) {
+      for (const [field, fieldSchema] of Object.entries(schema.properties)) {
+        if (field in args && args[field] !== null && args[field] !== undefined) {
+          const value = args[field];
+          const expectedType = fieldSchema.type;
+
+          if (expectedType === 'string' && typeof value !== 'string') {
+            errors.push(`Argument '${field}' must be a string, got ${typeof value}`);
+          } else if (expectedType === 'number' && typeof value !== 'number') {
+            errors.push(`Argument '${field}' must be a number, got ${typeof value}`);
+          } else if (expectedType === 'boolean' && typeof value !== 'boolean') {
+            errors.push(`Argument '${field}' must be a boolean, got ${typeof value}`);
+          } else if (expectedType === 'array' && !Array.isArray(value)) {
+            errors.push(`Argument '${field}' must be an array, got ${typeof value}`);
+          }
+        }
+      }
+    }
+
+    return errors;
+  }
+
+  /**
+   * Wrap tool execution with comprehensive error handling
+   */
+  async executeToolSafely(toolName, toolFunction, args, schema = null) {
+    const requestId = this.generateRequestId();
+
+    return await this.errorHandler.wrapAsync(async () => {
+      // Validate arguments if schema provided
+      if (schema) {
+        const validationErrors = this.validateToolArgs(toolName, args, schema);
+        if (validationErrors.length > 0) {
+          throw new EnhancedError(
+            `Tool validation failed: ${validationErrors.join(', ')}`,
+            ErrorTypes.VALIDATION_ERROR,
+            {
+              operation: 'executeToolSafely',
+              toolName,
+              validationErrors,
+              requestId
+            }
+          );
+        }
+      }
+
+      await this.logInfo(`Executing tool: ${toolName}`, {
+        requestId,
+        args: this.sanitizeArgsForLogging(args)
+      });
+
+      const result = await toolFunction.call(this, args);
+
+      await this.logInfo(`Tool execution completed: ${toolName}`, {
+        requestId,
+        success: true
+      });
+
+      return result;
+    }, {
+      operation: 'executeToolSafely',
+      toolName,
+      requestId
+    });
   }
 
   setupToolHandlers() {
@@ -237,101 +561,265 @@ export class DocumentOrganizationServer {
             },
             required: ['content']
           }
+        },
+        {
+          name: 'delete_document',
+          description: 'Delete a document from the system',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              file_path: { type: 'string', description: 'Relative path to the document to delete' }
+            },
+            required: ['file_path']
+          }
+        },
+        {
+          name: 'rename_document',
+          description: 'Rename a document',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              old_file_path: { type: 'string', description: 'Current relative path to the document' },
+              new_file_name: { type: 'string', description: 'New filename for the document' }
+            },
+            required: ['old_file_path', 'new_file_name']
+          }
+        },
+        {
+          name: 'move_document',
+          description: 'Move a document to a different category',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              file_path: { type: 'string', description: 'Current relative path to the document' },
+              new_category: { type: 'string', description: 'Target category name' }
+            },
+            required: ['file_path', 'new_category']
+          }
+        },
+        {
+          name: 'list_files_in_category',
+          description: 'List all files in a specific category',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              category: { type: 'string', description: 'Category name to list files from' }
+            },
+            required: ['category']
+          }
         }
       ]
     }));
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
+      const requestId = this.generateRequestId();
 
-      try {
+      // Enhanced logging with comprehensive context
+      await this.logInfo(`Tool call initiated: ${name}`, {
+        requestId,
+        toolName: name,
+        args: this.sanitizeArgsForLogging(args),
+        timestamp: new Date().toISOString(),
+        userAgent: request.meta?.userAgent || 'unknown'
+      });
+
+      // Wrap the entire tool execution in comprehensive error handling
+      return await this.errorHandler.wrapAsync(async () => {
+        // Validate tool name
+        const validTools = [
+          'search_documents', 'get_document_content', 'create_document', 'organize_documents',
+          'sync_documents', 'get_organization_stats', 'list_categories', 'get_system_status',
+          'analyze_content', 'find_duplicates', 'consolidate_content', 'suggest_categories',
+          'add_custom_category', 'enhance_content', 'delete_document', 'rename_document',
+          'move_document', 'list_files_in_category'
+        ];
+
+        if (!validTools.includes(name)) {
+          throw this.errorHandler.createContextualError(
+            `Unknown tool: ${name}`,
+            ErrorTypes.VALIDATION_ERROR,
+            {
+              operation: 'toolCall',
+              toolName: name,
+              requestId,
+              availableTools: validTools
+            }
+          );
+        }
+
+        let result;
         switch (name) {
           case 'search_documents':
-            return await this.searchDocuments(args);
+            result = await this.searchDocuments(args);
+            break;
           case 'get_document_content':
-            return await this.getDocumentContent(args);
+            result = await this.getDocumentContent(args);
+            break;
           case 'create_document':
-            return await this.createDocument(args);
+            result = await this.createDocument(args);
+            break;
           case 'organize_documents':
-            return await this.organizeDocuments(args);
+            result = await this.organizeDocuments(args);
+            break;
           case 'sync_documents':
-            return await this.syncDocuments(args);
+            result = await this.syncDocuments(args);
+            break;
           case 'get_organization_stats':
-            return await this.getOrganizationStats();
+            result = await this.getOrganizationStats();
+            break;
           case 'list_categories':
-            return await this.listCategories();
+            result = await this.listCategories();
+            break;
           case 'get_system_status':
-            return await this.getSystemStatus();
+            result = await this.getSystemStatus();
+            break;
           case 'analyze_content':
-            return await this.analyzeContent(args);
+            result = await this.analyzeContent(args);
+            break;
           case 'find_duplicates':
-            return await this.findDuplicates(args);
+            result = await this.findDuplicates(args);
+            break;
           case 'consolidate_content':
-            return await this.consolidateContent(args);
+            result = await this.consolidateContent(args);
+            break;
           case 'suggest_categories':
-            return await this.suggestCategories(args);
+            result = await this.suggestCategories(args);
+            break;
           case 'add_custom_category':
-            return await this.addCustomCategory(args);
+            result = await this.addCustomCategory(args);
+            break;
           case 'enhance_content':
-            return await this.enhanceContent(args);
+            result = await this.enhanceContent(args);
+            break;
           case 'delete_document':
-            return await this.deleteDocument(args);
+            result = await this.deleteDocument(args);
+            break;
           case 'rename_document':
-            return await this.renameDocument(args);
+            result = await this.renameDocument(args);
+            break;
           case 'move_document':
-            return await this.moveDocument(args);
+            result = await this.moveDocument(args);
+            break;
           case 'list_files_in_category':
-            return await this.listFilesInCategory(args);
+            result = await this.listFilesInCategory(args);
+            break;
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
+
+        await this.logInfo(`Tool call completed successfully: ${name}`, {
+          requestId,
+          toolName: name
+        });
+
+        return result;
       } catch (error) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Error: ${error.message}`
-            }
-          ],
-          isError: true
-        };
+        await this.logError(`Tool call failed: ${name}`, {
+          requestId,
+          toolName: name,
+          args: this.sanitizeArgsForLogging(args)
+        }, error);
+
+        return this.formatErrorResponse(error, name, requestId);
       }
     });
   }
 
   setupResourceHandlers() {
-    this.server.setRequestHandler(ListResourcesRequestSchema, async () => ({
-      resources: []
-    }));
+    this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
+      try {
+        await this.logDebug('Listing resources requested');
+        return { resources: [] };
+      } catch (error) {
+        await this.logError('Failed to list resources', {}, error);
+        return { resources: [] };
+      }
+    });
 
-    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => ({
-      contents: [
-        {
-          uri: request.params.uri,
-          mimeType: 'text/plain',
-          text: `Resource not found: ${request.params.uri}`
-        }
-      ]
-    }));
+    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      try {
+        const uri = request.params.uri;
+        await this.logDebug('Resource read requested', { uri });
+
+        return {
+          contents: [
+            {
+              uri,
+              mimeType: 'text/plain',
+              text: `Resource not found: ${uri}`
+            }
+          ]
+        };
+      } catch (error) {
+        await this.logError('Failed to read resource', { uri: request.params.uri }, error);
+        return {
+          contents: [
+            {
+              uri: request.params.uri,
+              mimeType: 'text/plain',
+              text: `Error reading resource: ${error.message}`
+            }
+          ]
+        };
+      }
+    });
   }
 
   async searchDocuments(args) {
     const { query, category, limit = 10, use_regex = false } = args;
 
+    if (!query || typeof query !== 'string' || query.trim().length === 0) {
+      throw new Error('Search query is required and must be a non-empty string');
+    }
+
     try {
       let searchPath = this.syncHub;
       if (category) {
         searchPath = path.join(this.syncHub, category);
+
+        // Verify category exists
+        try {
+          await fs.access(searchPath);
+        } catch (error) {
+          await this.logWarn(`Search category does not exist: ${category}`, { category, searchPath });
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  query,
+                  category,
+                  total_results: 0,
+                  results: [],
+                  warning: `Category '${category}' does not exist`
+                }, null, 2)
+              }
+            ]
+          };
+        }
       }
 
       const escapedQuery = query.replace(/'/g, "'\\''");
       const grepOptions = use_regex ? '-l -i -E' : '-l -i';
 
       const grepCommand = `find "${searchPath}" -type f -name "*.md" -o -name "*.txt" -o -name "*.doc*" | xargs grep ${grepOptions} '${escapedQuery}' 2>/dev/null || true`;
-      const results = execSync(grepCommand, { encoding: 'utf8' }).trim();
+
+      let results;
+      try {
+        results = execSync(grepCommand, { encoding: 'utf8' }).trim();
+      } catch (execError) {
+        await this.logError('Search command execution failed', {
+          command: grepCommand,
+          searchPath,
+          query
+        }, execError);
+        throw new Error(`Search execution failed: ${execError.message}`);
+      }
 
       const files = results ? results.split('\n').filter(Boolean) : [];
       const searchResults = [];
+      const processingErrors = [];
 
       for (const file of files.slice(0, limit)) {
         try {
@@ -348,24 +836,31 @@ export class DocumentOrganizationServer {
             modified: stats.mtime.toISOString(),
             preview
           });
-        } catch (error) {
-          this.logError(`Error processing file ${file}: ${error.message}`);
+        } catch (fileError) {
+          const errorMsg = `Error processing file ${file}`;
+          await this.logError(errorMsg, { file }, fileError);
+          processingErrors.push({ file, error: fileError.message });
         }
       }
+
+      const response = {
+        query,
+        total_results: searchResults.length,
+        results: searchResults,
+        ...(category && { category }),
+        ...(processingErrors.length > 0 && { processing_errors: processingErrors })
+      };
 
       return {
         content: [
           {
             type: 'text',
-            text: JSON.stringify({
-              query,
-              total_results: searchResults.length,
-              results: searchResults
-            }, null, 2)
+            text: JSON.stringify(response, null, 2)
           }
         ]
       };
     } catch (error) {
+      await this.logError('Search operation failed', { query, category, limit }, error);
       throw new Error(`Search failed: ${error.message}`);
     }
   }
@@ -373,10 +868,40 @@ export class DocumentOrganizationServer {
   async getDocumentContent(args) {
     const { file_path } = args;
 
+    if (!file_path || typeof file_path !== 'string') {
+      throw new Error('file_path is required and must be a string');
+    }
+
+    // Validate file path for security
+    if (file_path.includes('..') || path.isAbsolute(file_path)) {
+      throw new Error('Invalid file path: relative paths only, no parent directory access');
+    }
+
     try {
       const fullPath = path.join(this.syncHub, file_path);
-      const content = await fs.readFile(fullPath, 'utf8');
-      const stats = await fs.stat(fullPath);
+
+      // Check if file exists and is accessible
+      try {
+        await fs.access(fullPath, fs.constants.R_OK);
+      } catch (accessError) {
+        if (accessError.code === 'ENOENT') {
+          throw new Error(`Document not found: ${file_path}`);
+        } else if (accessError.code === 'EACCES') {
+          throw new Error(`Permission denied accessing document: ${file_path}`);
+        } else {
+          throw new Error(`Cannot access document: ${file_path} (${accessError.message})`);
+        }
+      }
+
+      const [content, stats] = await Promise.all([
+        fs.readFile(fullPath, 'utf8'),
+        fs.stat(fullPath)
+      ]);
+
+      await this.logInfo('Document content retrieved successfully', {
+        file_path,
+        size: stats.size
+      });
 
       return {
         content: [
@@ -393,12 +918,22 @@ export class DocumentOrganizationServer {
         ]
       };
     } catch (error) {
+      await this.logError('Failed to read document', { file_path }, error);
       throw new Error(`Failed to read document: ${error.message}`);
     }
   }
 
   async createDocument(args) {
     const { title, content, category } = args;
+
+    if (!title || typeof title !== 'string' || title.trim().length === 0) {
+      throw new Error('title is required and must be a non-empty string');
+    }
+
+    if (!content || typeof content !== 'string') {
+      throw new Error('content is required and must be a string');
+    }
+
     try {
       let targetCategory = category;
       // If category is not provided, default to 'Notes & Drafts'
@@ -406,18 +941,58 @@ export class DocumentOrganizationServer {
         targetCategory = 'Notes & Drafts';
       }
 
+      // Validate category name
+      if (targetCategory.includes('..') || path.isAbsolute(targetCategory)) {
+        throw new Error('Invalid category name: relative paths only, no parent directory access');
+      }
+
       // Create category directory if it doesn't exist
       const categoryPath = path.join(this.syncHub, targetCategory);
-      await fs.mkdir(categoryPath, { recursive: true });
+      try {
+        await fs.mkdir(categoryPath, { recursive: true });
+      } catch (mkdirError) {
+        await this.logError('Failed to create category directory', {
+          categoryPath,
+          targetCategory
+        }, mkdirError);
+        throw new Error(`Failed to create category directory: ${mkdirError.message}`);
+      }
 
-      // Create file
-      const fileName = `${title.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}.md`;
+      // Create safe filename
+      const fileName = `${title.replace(/[^a-zA-Z0-9\s\-_]/g, '').replace(/\s+/g, '_')}.md`;
       const filePath = path.join(categoryPath, fileName);
 
+      // Check if file already exists
+      try {
+        await fs.access(filePath);
+        throw new Error(`Document with title "${title}" already exists in category "${targetCategory}"`);
+      } catch (accessError) {
+        if (accessError.code !== 'ENOENT') {
+          throw accessError; // Re-throw if it's not a "file doesn't exist" error
+        }
+        // File doesn't exist, which is what we want
+      }
+
       const fileContent = `# ${title}\n\n${content}\n\n---\n*Created: ${new Date().toISOString()}*\n`;
-      await fs.writeFile(filePath, fileContent);
+
+      try {
+        await fs.writeFile(filePath, fileContent, 'utf8');
+      } catch (writeError) {
+        await this.logError('Failed to write document file', {
+          filePath,
+          title,
+          targetCategory
+        }, writeError);
+        throw new Error(`Failed to write document file: ${writeError.message}`);
+      }
 
       const relativePath = path.relative(this.syncHub, filePath);
+
+      await this.logInfo('Document created successfully', {
+        title,
+        category: targetCategory,
+        path: relativePath
+      });
 
       return {
         content: [
@@ -427,12 +1002,14 @@ export class DocumentOrganizationServer {
               success: true,
               path: relativePath,
               category: targetCategory,
+              filename: fileName,
               message: `Document created successfully in ${targetCategory}`
             }, null, 2)
           }
         ]
       };
     } catch (error) {
+      await this.logError('Document creation failed', { title, category }, error);
       throw new Error(`Failed to create document: ${error.message}`);
     }
   }
@@ -442,7 +1019,31 @@ export class DocumentOrganizationServer {
 
     try {
       const command = `cd "${this.projectRoot}" && ./src/organize/organize_module.sh ${dry_run ? 'dry-run' : 'run'}`;
-      const output = execSync(command, { encoding: 'utf8' });
+
+      await this.logInfo('Starting document organization', {
+        dry_run,
+        command: command.replace(this.projectRoot, '[PROJECT_ROOT]')
+      });
+
+      let output;
+      try {
+        output = execSync(command, {
+          encoding: 'utf8',
+          timeout: 300000, // 5 minute timeout
+          maxBuffer: 1024 * 1024 // 1MB buffer
+        });
+      } catch (execError) {
+        await this.logError('Organization command execution failed', {
+          command: command.replace(this.projectRoot, '[PROJECT_ROOT]'),
+          dry_run
+        }, execError);
+
+        // Try to extract useful information from stderr
+        const errorOutput = execError.stderr || execError.stdout || execError.message;
+        throw new Error(`Organization script failed: ${errorOutput}`);
+      }
+
+      await this.logInfo('Document organization completed successfully', { dry_run });
 
       return {
         content: [
@@ -451,12 +1052,14 @@ export class DocumentOrganizationServer {
             text: JSON.stringify({
               success: true,
               dry_run,
-              output: output.trim()
+              output: output.trim(),
+              timestamp: new Date().toISOString()
             }, null, 2)
           }
         ]
       };
     } catch (error) {
+      await this.logError('Document organization failed', { dry_run }, error);
       throw new Error(`Organization failed: ${error.message}`);
     }
   }
@@ -488,7 +1091,10 @@ export class DocumentOrganizationServer {
   async getOrganizationStats() {
     try {
       const { CategoryManager } = await import('../organize/category_manager.js');
-      const manager = new CategoryManager({ projectRoot: this.projectRoot });
+      const manager = new CategoryManager({
+        projectRoot: this.projectRoot,
+        configPath: path.join(this.projectRoot, 'config', 'organize_config.conf')
+      });
       await manager.initialize();
 
       const categoryStats = manager.getCategoryStats();
@@ -529,7 +1135,10 @@ export class DocumentOrganizationServer {
   async listCategories() {
     try {
       const { CategoryManager } = await import('../organize/category_manager.js');
-      const manager = new CategoryManager({ projectRoot: this.projectRoot });
+      const manager = new CategoryManager({
+        projectRoot: this.projectRoot,
+        configPath: path.join(this.projectRoot, 'config', 'organize_config.conf')
+      });
       await manager.initialize();
 
       const allCategories = manager.getAllCategories();
@@ -564,8 +1173,16 @@ export class DocumentOrganizationServer {
 
   async getSystemStatus() {
     try {
-      const command = `cd "${this.projectRoot}" && ./drive_sync.sh status`;
-      const output = execSync(command, { encoding: 'utf8' });
+      const configStatus = this.getConfigurationStatus();
+
+      let driveStatus = null;
+      try {
+        const command = `cd "${this.projectRoot}" && ./drive_sync.sh status`;
+        const output = execSync(command, { encoding: 'utf8' });
+        driveStatus = output.trim();
+      } catch (driveError) {
+        driveStatus = `Drive sync status unavailable: ${driveError.message}`;
+      }
 
       return {
         content: [
@@ -573,14 +1190,14 @@ export class DocumentOrganizationServer {
             type: 'text',
             text: JSON.stringify({
               system_status: 'running',
-              status_output: output.trim(),
+              configuration: configStatus,
+              drive_sync_status: driveStatus,
               timestamp: new Date().toISOString()
             }, null, 2)
           }
         ]
       };
     } catch (error) {
-      console.error(`Error executing drive_sync.sh status: ${command}\nStderr: ${error.stderr}`);
       throw new Error(`Failed to get system status: ${error.message}. See server logs for details.`);
     }
   }
@@ -676,21 +1293,125 @@ export class DocumentOrganizationServer {
     try {
       const { topic, file_paths, strategy = 'comprehensive_merge', enhance_with_ai = false } = args;
 
-      // Analyze each file before consolidation
-      const { ContentAnalyzer } = await import('../organize/content_analyzer.js');
+      // Use BatchProcessor if available, otherwise fallback to direct imports
+      if (this.modules.BatchProcessor) {
+        const processor = new this.modules.BatchProcessor.default({
+          projectRoot: this.projectRoot
+        });
+
+        const consolidationCandidate = {
+          topic,
+          files: file_paths.map(filePath => ({
+            filePath: path.join(this.syncHub, filePath),
+            analysis: {
+              topics: [topic],
+              metadata: {
+                suggestedTitle: path.basename(filePath, path.extname(filePath)),
+                originalFilename: path.basename(filePath)
+              }
+            }
+          })),
+          recommendedTitle: `${topic} - Consolidated`,
+          consolidationStrategy: strategy,
+          avgSimilarity: 0.8
+        };
+
+        const result = await processor.consolidateContent(consolidationCandidate, {
+          syncHubPath: this.syncHub,
+          enhanceContent: enhance_with_ai
+        });
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                consolidation_result: {
+                  success: result.success,
+                  target_folder: result.targetFolder,
+                  consolidated_document: result.consolidatedDocument,
+                  original_files: file_paths,
+                  strategy_used: result.consolidationStrategy
+                },
+                topic,
+                files_consolidated: file_paths.length,
+                timestamp: new Date().toISOString()
+              }, null, 2)
+            }
+          ]
+        };
+      }
+
+      // Fallback to direct module imports with error handling
+      let ContentAnalyzer, ContentConsolidator;
+
+      try {
+        if (this.modules.ContentAnalyzer) {
+          ContentAnalyzer = this.modules.ContentAnalyzer.ContentAnalyzer;
+        } else {
+          const module = await this.moduleLoader.safeImport('../organize/content_analyzer.js', { required: false });
+          ContentAnalyzer = module?.ContentAnalyzer;
+        }
+
+        if (this.modules.ContentConsolidator) {
+          ContentConsolidator = this.modules.ContentConsolidator.ContentConsolidator;
+        } else {
+          const module = await this.moduleLoader.safeImport('../organize/content_consolidator.js', { required: false });
+          ContentConsolidator = module?.ContentConsolidator;
+        }
+      } catch (importError) {
+        await this.logError('Failed to import required modules for consolidation', {}, importError);
+        throw new Error('Content consolidation modules not available');
+      }
+
+      if (!ContentAnalyzer || !ContentConsolidator) {
+        throw new Error('Required modules for content consolidation are not available');
+      }
+
       const analyzer = new ContentAnalyzer();
       const analyzedFiles = [];
+
       for (const filePath of file_paths) {
         const fullPath = path.join(this.syncHub, filePath);
-        const analysis = await analyzer.analyzeContent(fullPath);
-        analyzedFiles.push({
-          filePath,
-          analysis: analysis || { metadata: { suggestedTitle: path.basename(filePath, path.extname(filePath)) } }
-        });
+
+        try {
+          // Check if file exists first
+          await fs.access(fullPath);
+          const analysis = await analyzer.analyzeContent(fullPath);
+          if (analysis) {
+            analyzedFiles.push({
+              filePath: fullPath, // Use full path for consolidator
+              analysis
+            });
+          } else {
+            // Create minimal analysis if analyzer fails
+            const content = await fs.readFile(fullPath, 'utf8');
+            analyzedFiles.push({
+              filePath: fullPath, // Use full path for consolidator
+              analysis: {
+                metadata: {
+                  suggestedTitle: path.basename(filePath, path.extname(filePath)),
+                  wordCount: content.split(/\s+/).length,
+                  readingTime: Math.ceil(content.split(/\s+/).length / 200)
+                },
+                content: content
+              }
+            });
+          }
+        } catch (fileError) {
+          await this.logError(`Failed to read file for consolidation: ${filePath}`, { filePath }, fileError);
+          // Skip files that can't be read
+          continue;
+        }
+      }
+
+      if (analyzedFiles.length === 0) {
+        throw new Error('No valid files found to consolidate');
       }
 
       const consolidator = new ContentConsolidator({
         projectRoot: this.projectRoot,
+        syncHubPath: this.syncHub, // Use configured sync hub path
         enhanceContent: enhance_with_ai,
         aiService: enhance_with_ai ? 'local' : 'none'
       });
@@ -714,11 +1435,12 @@ export class DocumentOrganizationServer {
                 success: result.success,
                 target_folder: result.targetFolder,
                 consolidated_document: result.consolidatedDocument,
-                original_files: result.originalFiles,
+                original_files: file_paths, // Use original relative paths
                 strategy_used: result.consolidationStrategy
               },
               topic,
-              files_consolidated: file_paths.length,
+              files_consolidated: analyzedFiles.length,
+              files_requested: file_paths.length,
               timestamp: new Date().toISOString()
             }, null, 2)
           }
@@ -732,6 +1454,28 @@ export class DocumentOrganizationServer {
   async suggestCategories(args) {
     try {
       const { directory } = args;
+      const fullDirectoryPath = path.join(this.syncHub, directory);
+
+      // Check if directory exists
+      try {
+        await fs.access(fullDirectoryPath);
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                category_suggestion: null,
+                files_analyzed: 0,
+                poorly_categorized: 0,
+                suggestion_available: false,
+                error: `Directory '${directory}' does not exist`,
+                timestamp: new Date().toISOString()
+              }, null, 2)
+            }
+          ]
+        };
+      }
 
       // Import CategoryManager
       const { CategoryManager } = await import('../organize/category_manager.js');
@@ -747,24 +1491,39 @@ export class DocumentOrganizationServer {
 
       // Analyze files for poorly matched content
       const allFiles = [];
-      const entries = await fs.readdir(directory, { withFileTypes: true });
+      const entries = await fs.readdir(fullDirectoryPath, { withFileTypes: true });
 
       for (const entry of entries) {
         if (entry.isFile() && !entry.name.startsWith('.')) {
-          const filePath = path.join(directory, entry.name);
-          const analysis = await analyzer.analyzeContent(filePath);
-          if (analysis) {
-            const match = manager.findBestCategoryMatch(analysis);
-            allFiles.push({ filePath, analysis, match });
+          const filePath = path.join(fullDirectoryPath, entry.name);
+          try {
+            const analysis = await analyzer.analyzeContent(filePath);
+            if (analysis) {
+              const match = manager.findBestCategoryMatch(analysis);
+              allFiles.push({ filePath, analysis, match });
+            }
+          } catch (fileError) {
+            await this.logError(`Error analyzing file for category suggestion: ${entry.name}`, {
+              fileName: entry.name,
+              directory
+            }, fileError);
+            continue;
           }
         }
       }
 
-      const poorlyMatched = allFiles.filter(f => f.match.confidence < 0.5);
+      const poorlyMatched = allFiles.filter(f => f.match && f.match.confidence < 0.5);
 
       let suggestion = null;
       if (poorlyMatched.length >= 3) {
-        suggestion = await manager.suggestCategory(poorlyMatched[0].analysis, poorlyMatched);
+        try {
+          suggestion = await manager.suggestCategory(poorlyMatched[0].analysis, poorlyMatched);
+        } catch (suggestionError) {
+          await this.logError('Error generating category suggestion', {
+            directory,
+            poorlyMatchedCount: poorlyMatched.length
+          }, suggestionError);
+        }
       }
 
       return {
@@ -776,6 +1535,7 @@ export class DocumentOrganizationServer {
               files_analyzed: allFiles.length,
               poorly_categorized: poorlyMatched.length,
               suggestion_available: suggestion !== null,
+              directory: directory,
               timestamp: new Date().toISOString()
             }, null, 2)
           }
@@ -834,6 +1594,7 @@ export class DocumentOrganizationServer {
 
       const consolidator = new ContentConsolidator({
         projectRoot: this.projectRoot,
+        syncHubPath: this.syncHub, // Use configured sync hub path
         enhanceContent: true,
         aiService: 'local'
       });
@@ -960,12 +1721,24 @@ export class DocumentOrganizationServer {
   }
 
   async run() {
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
-    this.logError('Enhanced Document Organization MCP Server running on stdio');
+    try {
+      const transport = new StdioServerTransport();
+      await this.server.connect(transport);
+      await this.logInfo('Enhanced Document Organization MCP Server started successfully', {
+        projectRoot: this.projectRoot,
+        syncHub: this.syncHub,
+        configLoaded: this.configLoaded
+      });
+    } catch (error) {
+      await this.logError('Failed to start MCP Server', {}, error);
+      throw error;
+    }
   }
 }
 
 const docOrgServer = new DocumentOrganizationServer();
 
-docOrgServer.run().catch(err => docOrgServer.logError(`Server startup error: ${err.message}`));
+docOrgServer.run().catch(async (err) => {
+  await docOrgServer.logError('Server startup error', {}, err);
+  process.exit(1);
+});
