@@ -10,13 +10,14 @@ set -euo pipefail
 
 export PATH="/opt/homebrew/opt/util-linux/bin:$PATH"
 
-# Get script directory and parent
+# Get script directory and navigate to main project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+# Navigate up two levels: src/sync -> src -> project_root
+PROJECT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 
 # Load configuration with defaults
-CONFIG_FILE="$PROJECT_DIR/../config/config.env"
+CONFIG_FILE="$PROJECT_DIR/config/config.env"
 if [[ -f "$CONFIG_FILE" ]]; then
     source "$CONFIG_FILE"
 else
@@ -85,32 +86,42 @@ check_unison() {
 sync_with_unison() {
     local profile="$1"
     local dry_run_flag="${2:-false}"
-    local profile_path="$PROJECT_DIR/../config/$profile.prf"
+    local profile_path="$PROJECT_DIR/config/$profile.prf"
     if [[ ! -f "$profile_path" ]]; then
         log "ERROR" "Profile not found: $profile_path"
         return 1
     fi
     log "INFO" "Starting sync with profile: $profile${dry_run_flag:+ (dry-run)}"
-    local unison_dir="$HOME/.unison"
-    ensure_directory "$unison_dir"
-    # Only copy if source is newer
-    local dest_profile="$unison_dir/${profile#unison_}.prf"
-    if [[ ! -f "$dest_profile" || "$profile_path" -nt "$dest_profile" ]]; then
-        cp "$profile_path" "$dest_profile"
-    fi
-    # Use unique temp file
-    local tmpfile="/tmp/unison_output_$$.log"
+    
+    # Check if profile exists in ~/.unison/
     local profile_name="${profile#unison_}"
+    local unison_profile="$HOME/.unison/${profile_name}.prf"
+    
+    if [[ ! -f "$unison_profile" ]]; then
+        log "ERROR" "Unison profile not found: $unison_profile"
+        log "INFO" "Please ensure profiles are properly generated in ~/.unison/"
+        return 1
+    fi
+    
+    log "INFO" "Using Unison profile: $unison_profile"
+    
+    # Run Unison with progress output and timeout
     local unison_args=("$profile_name" -batch -auto)
     [[ "$dry_run_flag" == "true" ]] && unison_args+=( -testserver )
-    if unison "${unison_args[@]}" &> "$tmpfile"; then
+    
+    log "INFO" "Executing: unison ${unison_args[*]}"
+    
+    # Use timeout to prevent hanging (5 minutes max)
+    if timeout 300 unison "${unison_args[@]}"; then
         log "INFO" "Sync completed successfully: $profile"
-        rm -f "$tmpfile"
         return 0
     else
-        local unison_error=$(cat "$tmpfile")
-        log "ERROR" "Sync failed: $profile. Error: $unison_error"
-        rm -f "$tmpfile"
+        local exit_code=$?
+        if [[ $exit_code -eq 124 ]]; then
+            log "ERROR" "Sync timed out after 5 minutes: $profile"
+        else
+            log "ERROR" "Sync failed with exit code $exit_code: $profile"
+        fi
         return 1
     fi
 }

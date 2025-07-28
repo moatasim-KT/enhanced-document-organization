@@ -1460,7 +1460,13 @@ export class DocumentOrganizationServer {
           if (entry.isDirectory() && !entry.name.startsWith('.')) {
             await walk(fullPath);
           } else if (entry.isFile() && !entry.name.startsWith('.')) {
-            files.push(fullPath);
+            // Validate file actually exists and is accessible before including in analysis
+            try {
+              await fs.access(fullPath, fs.constants.F_OK | fs.constants.R_OK);
+              files.push(fullPath);
+            } catch (error) {
+              console.warn(`Skipping inaccessible file: ${fullPath} - ${error.message}`);
+            }
           }
         }
       }
@@ -1469,13 +1475,28 @@ export class DocumentOrganizationServer {
       // Import and use ContentAnalyzer
       const { ContentAnalyzer } = await import('../organize/content_analyzer.js');
       const analyzer = new ContentAnalyzer({ similarityThreshold: similarity_threshold });
+      
+      // Clear any stale cache to prevent phantom file issues
+      analyzer.contentCache.clear();
+      analyzer.analysisResults.clear();
+      
+      // Double-validate files exist before analysis to prevent cache corruption
+      const validatedFiles = [];
+      for (const filePath of files) {
+        try {
+          await fs.access(filePath, fs.constants.F_OK | fs.constants.R_OK);
+          validatedFiles.push(filePath);
+        } catch (error) {
+          console.warn(`Skipping file that became inaccessible: ${filePath}`);
+        }
+      }
 
-      const duplicates = await analyzer.findDuplicates(files);
+      const duplicates = await analyzer.findDuplicates(validatedFiles);
       const duplicateGroups = Array.from(duplicates.entries()).map(([key, group]) => ({
         key,
         type: group.type,
         similarity: group.similarity,
-        files: group.files.map(f => f.filePath),
+        files: group.files.map(f => path.relative(this.syncHub, f.filePath)),
         recommended_action: group.recommendedAction
       }));
 
@@ -1857,11 +1878,124 @@ export class DocumentOrganizationServer {
     }
   }
 
+  // Helper function to normalize similar-looking Unicode characters
+  normalizeUnicodeChars(str) {
+    const charMap = {
+      // Apostrophes and quotes
+      '\u2019': '\'',  // Right single quotation mark to apostrophe
+      '\u2018': '\'',  // Left single quotation mark to apostrophe
+      '\u201C': '"',  // Left double quotation mark to quote
+      '\u201D': '"',  // Right double quotation mark to quote
+      // Dashes
+      '\u2013': '-',  // En dash to hyphen
+      '\u2014': '-',  // Em dash to hyphen
+      // Spaces
+      '\u00A0': ' ',  // Non-breaking space to regular space
+      '\u2009': ' ',  // Thin space to regular space
+      '\u200A': ' ',  // Hair space to regular space
+    };
+    
+    let normalized = str;
+    for (const [unicode, ascii] of Object.entries(charMap)) {
+      normalized = normalized.replace(new RegExp(unicode, 'g'), ascii);
+    }
+    return normalized;
+  }
+
   async deleteDocument(args) {
     const { file_path } = args;
+    console.log(`[DELETE_DEBUG] Starting deleteDocument for: ${file_path}`);
     try {
+      // Always use directory listing approach to get exact filename
       const fullPath = path.isAbsolute(file_path) ? file_path : path.join(this.syncHub, file_path);
-      await fs.unlink(fullPath);
+      const dirPath = path.dirname(fullPath);
+      const expectedFileName = path.basename(fullPath);
+      console.log(`[DELETE_DEBUG] Paths - full: ${fullPath}, dir: ${dirPath}, file: ${expectedFileName}`);
+      
+      // Get actual files from directory to find exact match
+      let actualFilePath;
+      let debugInfo = '';
+      try {
+        debugInfo += `Reading directory: ${dirPath}\n`;
+        const files = await fs.readdir(dirPath);
+        debugInfo += `Found ${files.length} files in directory\n`;
+        debugInfo += `Expected filename: "${expectedFileName}"\n`;
+        debugInfo += `Expected filename bytes: ${Buffer.from(expectedFileName, 'utf8').toString('hex')}\n`;
+        
+        // Find files that contain "Apple" for debugging
+        const appleFiles = files.filter(f => f.includes('Apple'));
+        debugInfo += `Apple-related files found: ${appleFiles.length}\n`;
+        appleFiles.forEach((file, i) => {
+          debugInfo += `  ${i+1}. "${file}" (bytes: ${Buffer.from(file, 'utf8').toString('hex')})\n`;
+        });
+        
+        // Find exact match by comparing the expected filename with actual files
+        // This handles Unicode encoding differences between analysis and delete tools
+        const matchingFile = files.find(actualFile => {
+          // Direct match
+          if (actualFile === expectedFileName) {
+            debugInfo += `Direct match found: "${actualFile}"\n`;
+            return true;
+          }
+          
+          // Try character substitution for similar-looking Unicode characters
+          const normalizedActual = this.normalizeUnicodeChars(actualFile);
+          const normalizedExpected = this.normalizeUnicodeChars(expectedFileName);
+          if (normalizedActual === normalizedExpected) {
+            debugInfo += `Character substitution match found: "${actualFile}" -> "${normalizedActual}"\n`;
+            return true;
+          }
+          
+          // Try various Unicode normalizations
+          const normalizations = ['NFC', 'NFD', 'NFKC', 'NFKD'];
+          for (const norm of normalizations) {
+            if (actualFile.normalize(norm) === expectedFileName.normalize(norm)) {
+              debugInfo += `Unicode match found with ${norm}: "${actualFile}"\n`;
+              return true;
+            }
+            if (actualFile === expectedFileName.normalize(norm)) {
+              debugInfo += `Filename normalization match found with ${norm}: "${actualFile}"\n`;
+              return true;
+            }
+            if (actualFile.normalize(norm) === expectedFileName) {
+              debugInfo += `File normalization match found with ${norm}: "${actualFile}"\n`;
+              return true;
+            }
+            
+            // Try character substitution with Unicode normalization
+            const normActual = this.normalizeUnicodeChars(actualFile.normalize(norm));
+            const normExpected = this.normalizeUnicodeChars(expectedFileName.normalize(norm));
+            if (normActual === normExpected) {
+              debugInfo += `Combined normalization + substitution match with ${norm}: "${actualFile}"\n`;
+              return true;
+            }
+          }
+          
+          return false;
+        });
+        
+        debugInfo += `Matching file result: ${matchingFile || 'NONE'}\n`;
+        
+        if (!matchingFile) {
+          throw new Error(`File does not exist. Debug info:\n${debugInfo}`);
+        }
+        
+        actualFilePath = path.join(dirPath, matchingFile);
+        debugInfo += `Using actual file path: ${actualFilePath}\n`;
+        
+        // Verify the exact file can be accessed
+        await fs.access(actualFilePath, fs.constants.F_OK);
+        debugInfo += `File access verification succeeded\n`;
+        
+      } catch (error) {
+        if (error.message.includes('Debug info:')) {
+          throw error; // Re-throw with debug info intact
+        }
+        throw new Error(`Directory listing failed: ${error.message}. Debug info:\n${debugInfo}`);
+      }
+      
+      // Delete using the exact filename from directory listing
+      await fs.unlink(actualFilePath);
       return {
         content: [
           {
@@ -1874,7 +2008,12 @@ export class DocumentOrganizationServer {
         ]
       };
     } catch (error) {
-      throw new Error(`Failed to delete document ${file_path}: ${error.message}`);
+      // Preserve debug information if present
+      if (error.message.includes('Debug info:')) {
+        throw new Error(`Failed to delete document ${file_path}: ${error.message}`);
+      } else {
+        throw new Error(`Failed to delete document ${file_path}: ${error.message}`);
+      }
     }
   }
 

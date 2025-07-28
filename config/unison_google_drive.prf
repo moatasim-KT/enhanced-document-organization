@@ -2,7 +2,7 @@
 # Syncs between local sync hub and Google Drive
 
 # Sync directories
-root = $SYNC_HUB
+root = /Users/moatasimfarooque/Sync_Hub_New
 root = /Users/moatasimfarooque/Library/CloudStorage/GoogleDrive-moatasim23android@gmail.com/My Drive/Sync
 
 # Basic sync options
@@ -33,6 +33,20 @@ ignore = Name *.gsheet
 ignore = Name *.gslides
 ignore = Name .tmp.driveupload
 ignore = Name .tmp.drivedownload
+
+# Obsidian specific ignores
+ignore = Name .obsidian
+ignore = Path .obsidian/*
+ignore = Name plugins
+ignore = Path plugins/*
+ignore = Name .obsidian.vimrc
+ignore = Name workspace.json
+ignore = Name app.json
+ignore = Name hotkeys.json
+ignore = Name appearance.json
+ignore = Name community-plugins.json
+ignore = Name core-plugins.json
+ignore = Name core-plugins-migration.json
 
 # Common problematic file patterns
 ignore = Regex .*:.*

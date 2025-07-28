@@ -8,12 +8,13 @@
 
 set -euo pipefail
 
-# Get script directory and parent
+# Get script directory and navigate to main project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+# Navigate up two levels: src/organize -> src -> project_root
+PROJECT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 # Load configuration with validation
-CONFIG_FILE="$PROJECT_DIR/../config/config.env"
+CONFIG_FILE="$PROJECT_DIR/config/config.env"
 if [[ ! -f "$CONFIG_FILE" ]]; then
     echo "❌ Configuration file not found: $CONFIG_FILE"
     echo "💡 Run system validation: node $PROJECT_DIR/startup_validator.js"
