@@ -702,17 +702,6 @@ export class DocumentOrganizationServer {
             },
             required: ['file_path', 'new_category']
           }
-        },
-        {
-          name: 'list_files_in_category',
-          description: 'List all files in a specific category',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              category: { type: 'string', description: 'Category name to list files from' }
-            },
-            required: ['category']
-          }
         }
       ]
     }));
@@ -738,7 +727,7 @@ export class DocumentOrganizationServer {
           'sync_documents', 'get_organization_stats', 'list_categories', 'get_system_status',
           'analyze_content', 'find_duplicates', 'consolidate_content', 'suggest_categories',
           'add_custom_category', 'enhance_content', 'delete_document', 'rename_document',
-          'move_document', 'list_files_in_category'
+          'move_document'
         ];
 
         if (!validTools.includes(name)) {
@@ -809,9 +798,6 @@ export class DocumentOrganizationServer {
             break;
           case 'move_document':
             result = await this.moveDocument(args);
-            break;
-          case 'list_files_in_category':
-            result = await this.listFilesInCategory(args);
             break;
           default:
             throw new Error(`Unknown tool: ${name}`);
@@ -1052,24 +1038,107 @@ export class DocumentOrganizationServer {
     const { file_path } = args;
 
     try {
-      const fullPath = path.isAbsolute(file_path) ? file_path : path.join(this.syncHub, file_path);
+      // Use robust path resolution for special characters and Unicode
+      let actualFilePath;
+      const searchPaths = [
+        path.isAbsolute(file_path) ? file_path : null,
+        path.join(this.syncHub, file_path),
+        path.join(this.projectRoot, file_path),
+        path.join(this.syncHub, 'organized', file_path),
+        path.join(this.syncHub, path.basename(file_path))
+      ].filter(Boolean);
 
-      // Check if file exists and is accessible
-      try {
-        await fs.access(fullPath, fs.constants.R_OK);
-      } catch (accessError) {
-        if (accessError.code === 'ENOENT') {
-          throw new Error(`Document not found: ${file_path}`);
-        } else if (accessError.code === 'EACCES') {
-          throw new Error(`Permission denied accessing document: ${file_path}`);
-        } else {
-          throw new Error(`Cannot access document: ${file_path} (${accessError.message})`);
+      // First try simple access
+      for (const searchPath of searchPaths) {
+        try {
+          await fs.access(searchPath, fs.constants.R_OK);
+          actualFilePath = searchPath;
+          break;
+        } catch {
+          continue;
         }
       }
 
+      // If simple access fails, use directory listing approach for special characters/Unicode
+      if (!actualFilePath) {
+        for (const searchPath of searchPaths) {
+          try {
+            const dirPath = path.dirname(searchPath);
+            const expectedFileName = path.basename(searchPath);
+            
+            // Check if directory exists first
+            try {
+              await fs.access(dirPath);
+            } catch {
+              continue;
+            }
+            
+            // Get actual files from directory to find exact match
+            const files = await fs.readdir(dirPath);
+            
+            // Find exact match by comparing the expected filename with actual files
+            const matchingFile = files.find(actualFile => {
+              // Direct match
+              if (actualFile === expectedFileName) {
+                return true;
+              }
+              
+              // Try character substitution for similar-looking Unicode characters
+              const normalizedActual = this.normalizeUnicodeChars(actualFile);
+              const normalizedExpected = this.normalizeUnicodeChars(expectedFileName);
+              if (normalizedActual === normalizedExpected) {
+                return true;
+              }
+              
+              // Try various Unicode normalizations
+              const normalizations = ['NFC', 'NFD', 'NFKC', 'NFKD'];
+              for (const norm of normalizations) {
+                if (actualFile.normalize(norm) === expectedFileName.normalize(norm)) {
+                  return true;
+                }
+                if (actualFile === expectedFileName.normalize(norm)) {
+                  return true;
+                }
+                if (actualFile.normalize(norm) === expectedFileName) {
+                  return true;
+                }
+                
+                // Try character substitution with Unicode normalization
+                const normActual = this.normalizeUnicodeChars(actualFile.normalize(norm));
+                const normExpected = this.normalizeUnicodeChars(expectedFileName.normalize(norm));
+                if (normActual === normExpected) {
+                  return true;
+                }
+              }
+              
+              return false;
+            });
+            
+            if (matchingFile) {
+              actualFilePath = path.join(dirPath, matchingFile);
+              // Verify the exact file can be accessed
+              try {
+                await fs.access(actualFilePath, fs.constants.R_OK);
+                break;
+              } catch {
+                actualFilePath = null;
+                continue;
+              }
+            }
+          } catch {
+            continue;
+          }
+        }
+      }
+
+      // Check if file exists and is accessible
+      if (!actualFilePath) {
+        throw new Error(`Document not found: ${file_path}`);
+      }
+
       const [content, stats] = await Promise.all([
-        fs.readFile(fullPath, 'utf8'),
-        fs.stat(fullPath)
+        fs.readFile(actualFilePath, 'utf8'),
+        fs.stat(actualFilePath)
       ]);
 
       await this.logInfo('Document content retrieved successfully', {
@@ -1392,26 +1461,128 @@ export class DocumentOrganizationServer {
 
       const results = new Map();
 
-      // If file_paths is a single directory, recursively collect all files
+      // Enhanced file path resolution for analyze_content with special character handling
       const allFiles = [];
       for (const filePath of file_paths) {
-        const fullPath = path.isAbsolute(filePath) ? filePath : path.join(this.syncHub, filePath);
-        const stat = await fs.stat(fullPath);
+        // Use robust path resolution for special characters and Unicode
+        let actualPath;
+        const searchPaths = [
+          path.isAbsolute(filePath) ? filePath : null,
+          path.join(this.syncHub, filePath),
+          path.join(this.projectRoot, filePath),
+          path.join(this.syncHub, 'organized', filePath),
+          path.join(this.syncHub, path.basename(filePath))
+        ].filter(Boolean);
+
+        // First try simple access
+        for (const searchPath of searchPaths) {
+          try {
+            await fs.access(searchPath);
+            actualPath = searchPath;
+            break;
+          } catch {
+            continue;
+          }
+        }
+
+        // If simple access fails, use directory listing approach for special characters/Unicode
+        if (!actualPath) {
+          for (const searchPath of searchPaths) {
+            try {
+              const dirPath = path.dirname(searchPath);
+              const expectedFileName = path.basename(searchPath);
+              
+              // Check if directory exists first
+              try {
+                await fs.access(dirPath);
+              } catch {
+                continue;
+              }
+              
+              // Get actual files from directory to find exact match
+              const files = await fs.readdir(dirPath);
+              
+              // Find exact match by comparing the expected filename with actual files
+              const matchingFile = files.find(actualFile => {
+                // Direct match
+                if (actualFile === expectedFileName) {
+                  return true;
+                }
+                
+                // Try character substitution for similar-looking Unicode characters
+                const normalizedActual = this.normalizeUnicodeChars(actualFile);
+                const normalizedExpected = this.normalizeUnicodeChars(expectedFileName);
+                if (normalizedActual === normalizedExpected) {
+                  return true;
+                }
+                
+                // Try various Unicode normalizations
+                const normalizations = ['NFC', 'NFD', 'NFKC', 'NFKD'];
+                for (const norm of normalizations) {
+                  if (actualFile.normalize(norm) === expectedFileName.normalize(norm)) {
+                    return true;
+                  }
+                  if (actualFile === expectedFileName.normalize(norm)) {
+                    return true;
+                  }
+                  if (actualFile.normalize(norm) === expectedFileName) {
+                    return true;
+                  }
+                  
+                  // Try character substitution with Unicode normalization
+                  const normActual = this.normalizeUnicodeChars(actualFile.normalize(norm));
+                  const normExpected = this.normalizeUnicodeChars(expectedFileName.normalize(norm));
+                  if (normActual === normExpected) {
+                    return true;
+                  }
+                }
+                
+                return false;
+              });
+              
+              if (matchingFile) {
+                actualPath = path.join(dirPath, matchingFile);
+                // Verify the exact file can be accessed
+                try {
+                  await fs.access(actualPath, fs.constants.F_OK);
+                  break;
+                } catch {
+                  actualPath = null;
+                  continue;
+                }
+              }
+            } catch {
+              continue;
+            }
+          }
+        }
+
+        if (!actualPath) {
+          throw new Error(`File or directory not found: ${filePath}`);
+        }
+
+        const stat = await fs.stat(actualPath);
         if (stat.isDirectory()) {
-          async function walk(dir) {
+          const walk = async (dir) => {
             const entries = await fs.readdir(dir, { withFileTypes: true });
             for (const entry of entries) {
               const entryPath = path.join(dir, entry.name);
+              
+              // Skip Obsidian-related files and directories
+              if (this.isObsidianFile(entryPath)) {
+                continue;
+              }
+              
               if (entry.isDirectory() && !entry.name.startsWith('.')) {
                 await walk(entryPath);
               } else if (entry.isFile() && !entry.name.startsWith('.')) {
                 allFiles.push(entryPath);
               }
             }
-          }
-          await walk(fullPath);
+          };
+          await walk(actualPath);
         } else if (stat.isFile()) {
-          allFiles.push(fullPath);
+          allFiles.push(actualPath);
         }
       }
       for (const file of allFiles) {
@@ -1453,10 +1624,16 @@ export class DocumentOrganizationServer {
 
       // Recursively get all files in directory and subdirectories
       const files = [];
-      async function walk(dir) {
+      const walk = async (dir) => {
         const entries = await fs.readdir(dir, { withFileTypes: true });
         for (const entry of entries) {
           const fullPath = path.join(dir, entry.name);
+          
+          // Skip Obsidian-related files and directories
+          if (this.isObsidianFile(fullPath)) {
+            continue;
+          }
+          
           if (entry.isDirectory() && !entry.name.startsWith('.')) {
             await walk(fullPath);
           } else if (entry.isFile() && !entry.name.startsWith('.')) {
@@ -1469,7 +1646,7 @@ export class DocumentOrganizationServer {
             }
           }
         }
-      }
+      };
       await walk(fullDirectoryPath);
 
       // Import and use ContentAnalyzer
@@ -1526,24 +1703,184 @@ export class DocumentOrganizationServer {
     try {
       const { topic, file_paths, strategy = 'comprehensive_merge', enhance_with_ai = false, dry_run = false } = args;
 
+      // Enhanced input validation
+      if (!topic || typeof topic !== 'string') {
+        throw new Error('Topic is required and must be a string');
+      }
+
+      if (!file_paths || !Array.isArray(file_paths) || file_paths.length === 0) {
+        throw new Error('file_paths is required and must be a non-empty array');
+      }
+
+      // Enhanced file path resolution with multiple search locations and Unicode/special character handling
+      const resolveFilePath = async (filePath) => {
+        const searchPaths = [
+          // Try absolute path first
+          path.isAbsolute(filePath) ? filePath : null,
+          // Try relative to sync hub
+          path.join(this.syncHub, filePath),
+          // Try relative to project root
+          path.join(this.projectRoot, filePath),
+          // Try in organized folders within sync hub
+          path.join(this.syncHub, 'organized', filePath),
+          // Try direct filename search in sync hub
+          path.join(this.syncHub, path.basename(filePath))
+        ].filter(Boolean);
+
+        // First try simple access for each search path
+        for (const searchPath of searchPaths) {
+          try {
+            await fs.access(searchPath);
+            return searchPath;
+          } catch {
+            continue;
+          }
+        }
+
+        // If simple access fails, use directory listing approach to handle special characters/Unicode
+        for (const searchPath of searchPaths) {
+          try {
+            const dirPath = path.dirname(searchPath);
+            const expectedFileName = path.basename(searchPath);
+            
+            // Check if directory exists first
+            try {
+              await fs.access(dirPath);
+            } catch {
+              continue; // Directory doesn't exist, try next search path
+            }
+            
+            // Get actual files from directory to find exact match
+            const files = await fs.readdir(dirPath);
+            
+            // Find exact match by comparing the expected filename with actual files
+            // This handles Unicode encoding differences between analysis and consolidation tools
+            const matchingFile = files.find(actualFile => {
+              // Direct match
+              if (actualFile === expectedFileName) {
+                return true;
+              }
+              
+              // Try character substitution for similar-looking Unicode characters
+              const normalizedActual = this.normalizeUnicodeChars(actualFile);
+              const normalizedExpected = this.normalizeUnicodeChars(expectedFileName);
+              if (normalizedActual === normalizedExpected) {
+                return true;
+              }
+              
+              // Try various Unicode normalizations
+              const normalizations = ['NFC', 'NFD', 'NFKC', 'NFKD'];
+              for (const norm of normalizations) {
+                if (actualFile.normalize(norm) === expectedFileName.normalize(norm)) {
+                  return true;
+                }
+                if (actualFile === expectedFileName.normalize(norm)) {
+                  return true;
+                }
+                if (actualFile.normalize(norm) === expectedFileName) {
+                  return true;
+                }
+                
+                // Try character substitution with Unicode normalization
+                const normActual = this.normalizeUnicodeChars(actualFile.normalize(norm));
+                const normExpected = this.normalizeUnicodeChars(expectedFileName.normalize(norm));
+                if (normActual === normExpected) {
+                  return true;
+                }
+              }
+              
+              return false;
+            });
+            
+            if (matchingFile) {
+              const actualFilePath = path.join(dirPath, matchingFile);
+              // Verify the exact file can be accessed
+              try {
+                await fs.access(actualFilePath, fs.constants.F_OK);
+                return actualFilePath;
+              } catch {
+                continue; // File access failed, try next search path
+              }
+            }
+          } catch {
+            continue; // Directory listing failed, try next search path
+          }
+        }
+        
+        return null;
+      };
+
       // Use BatchProcessor if available, otherwise fallback to direct imports
       if (this.modules.BatchProcessor) {
         const processor = new this.modules.BatchProcessor.default({
           projectRoot: this.projectRoot
         });
 
+        // Enhanced file resolution for batch processor with special character handling
+        const resolvedFiles = [];
+        const unresolvedFiles = [];
+
+        for (const filePath of file_paths) {
+          // Check if this is an Obsidian-related file that should not be consolidated
+          const fullPathForCheck = path.isAbsolute(filePath) ? filePath : path.join(this.syncHub, filePath);
+          if (this.isObsidianFile(fullPathForCheck)) {
+            unresolvedFiles.push(`${filePath} (Obsidian file - protected)`);
+            continue;
+          }
+          
+          const resolvedPath = await resolveFilePath(filePath);
+          if (resolvedPath) {
+            // Double-check resolved path is not an Obsidian file
+            if (this.isObsidianFile(resolvedPath)) {
+              unresolvedFiles.push(`${filePath} (Obsidian file - protected)`);
+              continue;
+            }
+            
+            resolvedFiles.push({
+              filePath: resolvedPath,
+              originalPath: filePath,
+              analysis: {
+                topics: [topic],
+                metadata: {
+                  suggestedTitle: path.basename(filePath, path.extname(filePath)),
+                  originalFilename: path.basename(filePath)
+                }
+              }
+            });
+          } else {
+            unresolvedFiles.push(filePath);
+          }
+        }
+
+        if (resolvedFiles.length === 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  success: false,
+                  message: `No accessible files found for consolidation. All ${file_paths.length} files were inaccessible.`,
+                  unresolved_files: unresolvedFiles,
+                  search_locations: [
+                    this.syncHub,
+                    this.projectRoot,
+                    path.join(this.syncHub, 'organized')
+                  ],
+                  suggestions: [
+                    'Check if files exist in the sync hub directory',
+                    'Verify file paths are correct',
+                    'Ensure files have been organized first'
+                  ],
+                  timestamp: new Date().toISOString()
+                }, null, 2)
+              }
+            ]
+          };
+        }
+
         const consolidationCandidate = {
           topic,
-          files: file_paths.map(filePath => ({
-            filePath: path.isAbsolute(filePath) ? filePath : path.join(this.syncHub, filePath),
-            analysis: {
-              topics: [topic],
-              metadata: {
-                suggestedTitle: path.basename(filePath, path.extname(filePath)),
-                originalFilename: path.basename(filePath)
-              }
-            }
-          })),
+          files: resolvedFiles,
           recommendedTitle: `${topic} - Consolidated`,
           consolidationStrategy: strategy,
           avgSimilarity: 0.8
@@ -1565,11 +1902,14 @@ export class DocumentOrganizationServer {
                   target_folder: result.targetFolder,
                   consolidated_document: result.consolidatedDocument,
                   original_files: file_paths,
+                  resolved_files: resolvedFiles.map(f => f.filePath),
+                  unresolved_files: unresolvedFiles,
                   strategy_used: result.consolidationStrategy,
                   dry_run: dry_run
                 },
                 topic,
-                files_consolidated: file_paths.length,
+                files_consolidated: resolvedFiles.length,
+                files_requested: file_paths.length,
                 timestamp: new Date().toISOString()
               }, null, 2)
             }
@@ -1577,79 +1917,188 @@ export class DocumentOrganizationServer {
         };
       }
 
-      // Fallback to direct module imports with error handling
+      // Enhanced fallback to direct module imports with better error handling
       let ContentAnalyzer, ContentConsolidator;
 
       try {
-        // Robustly import ContentAnalyzer
+        // Robustly import ContentAnalyzer with multiple fallback strategies
         let analyzerModule;
         if (this.modules.ContentAnalyzer) {
           analyzerModule = this.modules.ContentAnalyzer;
         } else {
-          analyzerModule = await this.moduleLoader.safeImport('../organize/content_analyzer.js', { required: false });
+          // Try multiple import paths
+          const analyzerPaths = [
+            '../organize/content_analyzer.js',
+            './organize/content_analyzer.js',
+            '../../organize/content_analyzer.js'
+          ];
+          
+          for (const analyzerPath of analyzerPaths) {
+            try {
+              analyzerModule = await this.moduleLoader.safeImport(analyzerPath, { required: false });
+              if (analyzerModule) break;
+            } catch {
+              continue;
+            }
+          }
         }
         ContentAnalyzer = analyzerModule?.ContentAnalyzer || analyzerModule?.default;
 
-        // Robustly import ContentConsolidator
+        // Robustly import ContentConsolidator with multiple fallback strategies
         let consolidatorModule;
         if (this.modules.ContentConsolidator) {
           consolidatorModule = this.modules.ContentConsolidator;
         } else {
-          consolidatorModule = await this.moduleLoader.safeImport('../organize/content_consolidator.js', { required: false });
+          // Try multiple import paths
+          const consolidatorPaths = [
+            '../organize/content_consolidator.js',
+            './organize/content_consolidator.js',
+            '../../organize/content_consolidator.js'
+          ];
+          
+          for (const consolidatorPath of consolidatorPaths) {
+            try {
+              consolidatorModule = await this.moduleLoader.safeImport(consolidatorPath, { required: false });
+              if (consolidatorModule) break;
+            } catch {
+              continue;
+            }
+          }
         }
         ContentConsolidator = consolidatorModule?.ContentConsolidator || consolidatorModule?.default;
       } catch (importError) {
         await this.logError('Failed to import required modules for consolidation', {}, importError);
-        throw new Error('Content consolidation modules not available');
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: false,
+                message: 'Content consolidation modules not available',
+                error: importError.message,
+                module_paths_tried: [
+                  '../organize/content_analyzer.js',
+                  './organize/content_analyzer.js', 
+                  '../../organize/content_analyzer.js',
+                  '../organize/content_consolidator.js',
+                  './organize/content_consolidator.js',
+                  '../../organize/content_consolidator.js'
+                ],
+                suggestions: [
+                  'Ensure organize modules are properly installed',
+                  'Check module paths and dependencies',
+                  'Try running the organize_documents tool first'
+                ],
+                timestamp: new Date().toISOString()
+              }, null, 2)
+            }
+          ]
+        };
       }
 
       if (!ContentAnalyzer || !ContentConsolidator) {
-        throw new Error('Required modules for content consolidation are not available');
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                success: false,
+                message: 'Required modules for content consolidation are not available',
+                available_modules: {
+                  ContentAnalyzer: !!ContentAnalyzer,
+                  ContentConsolidator: !!ContentConsolidator
+                },
+                suggestions: [
+                  'Check if organize modules are properly loaded',
+                  'Try restarting the MCP server',
+                  'Verify module dependencies are installed'
+                ],
+                timestamp: new Date().toISOString()
+              }, null, 2)
+            }
+          ]
+        };
       }
 
       const analyzer = new ContentAnalyzer();
       const analyzedFiles = [];
+      const processingErrors = [];
+      const unresolvedFiles = [];
 
+      // Enhanced batch processing with better error tracking
       for (const filePath of file_paths) {
-        const fullPath = path.isAbsolute(filePath) ? filePath : path.join(this.syncHub, filePath);
+        // Check if this is an Obsidian-related file that should not be consolidated
+        const fullPathForCheck = path.isAbsolute(filePath) ? filePath : path.join(this.syncHub, filePath);
+        if (this.isObsidianFile(fullPathForCheck)) {
+          unresolvedFiles.push(`${filePath} (Obsidian file - protected)`);
+          continue;
+        }
+        
+        const resolvedPath = await resolveFilePath(filePath);
+        
+        if (!resolvedPath) {
+          unresolvedFiles.push(filePath);
+          continue;
+        }
+        
+        // Double-check resolved path is not an Obsidian file
+        if (this.isObsidianFile(resolvedPath)) {
+          unresolvedFiles.push(`${filePath} (Obsidian file - protected)`);
+          continue;
+        }
 
         try {
-          // Check if file exists first
-          await fs.access(fullPath);
-          const analysis = await analyzer.analyzeContent(fullPath);
+          // Attempt to analyze the file
+          const analysis = await analyzer.analyzeContent(resolvedPath);
           if (analysis) {
             analyzedFiles.push({
-              filePath: fullPath, // Use full path for consolidator
+              filePath: resolvedPath,
+              originalPath: filePath,
               analysis
             });
           } else {
-            // Create minimal analysis if analyzer fails
-            const content = await fs.readFile(fullPath, 'utf8');
-            analyzedFiles.push({
-              filePath: fullPath, // Use full path for consolidator
-              analysis: {
-                metadata: {
-                  suggestedTitle: path.basename(filePath, path.extname(filePath)),
-                  wordCount: content.split(/\s+/).length,
-                  readingTime: Math.ceil(content.split(/\s+/).length / 200)
-                },
-                content: content
-              }
-            });
+            // Create minimal analysis if analyzer fails but file is readable
+            try {
+              const content = await fs.readFile(resolvedPath, 'utf8');
+              analyzedFiles.push({
+                filePath: resolvedPath,
+                originalPath: filePath,
+                analysis: {
+                  metadata: {
+                    suggestedTitle: path.basename(filePath, path.extname(filePath)),
+                    wordCount: content.split(/\s+/).length,
+                    readingTime: Math.ceil(content.split(/\s+/).length / 200),
+                    fileSize: content.length,
+                    lastModified: (await fs.stat(resolvedPath)).mtime
+                  },
+                  content: content,
+                  topics: [topic],
+                  summary: content.substring(0, 200) + (content.length > 200 ? '...' : '')
+                }
+              });
+            } catch (readError) {
+              processingErrors.push({
+                file: filePath,
+                resolvedPath: resolvedPath,
+                error: `Failed to read file: ${readError.message}`,
+                type: 'read_error'
+              });
+            }
           }
-        } catch (fileError) {
-          await this.logError(`Failed to read file for consolidation: ${filePath}`, { filePath }, fileError);
-          // Add file to error list but continue processing
-          analyzedFiles.push({
-            filePath: fullPath,
-            error: fileError.message,
-            analysis: null
+        } catch (analysisError) {
+          await this.logError(`Failed to analyze file for consolidation: ${filePath}`, { filePath, resolvedPath }, analysisError);
+          processingErrors.push({
+            file: filePath,
+            resolvedPath: resolvedPath,
+            error: analysisError.message,
+            type: 'analysis_error'
           });
-          continue;
         }
       }
 
       const validFiles = analyzedFiles.filter(f => f.analysis !== null);
+      
+      // Enhanced error reporting for batch processing
       if (validFiles.length === 0) {
         return {
           content: [
@@ -1657,9 +2106,27 @@ export class DocumentOrganizationServer {
               type: 'text',
               text: JSON.stringify({
                 success: false,
-                message: `No accessible files found for consolidation. Checked ${file_paths.length} files.`,
-                errors: analyzedFiles.filter(f => f.error).map(f => ({ file: f.filePath, error: f.error })),
-                file_paths_requested: file_paths,
+                message: `No accessible files found for consolidation. Processed ${file_paths.length} files with 0 successful.`,
+                batch_processing_summary: {
+                  files_requested: file_paths.length,
+                  files_resolved: file_paths.length - unresolvedFiles.length,
+                  files_analyzed: validFiles.length,
+                  processing_errors: processingErrors.length,
+                  unresolved_files: unresolvedFiles.length
+                },
+                unresolved_files: unresolvedFiles,
+                processing_errors: processingErrors,
+                search_locations: [
+                  this.syncHub,
+                  this.projectRoot,
+                  path.join(this.syncHub, 'organized')
+                ],
+                suggestions: [
+                  'Check if files exist in the expected locations',
+                  'Verify file permissions and accessibility',
+                  'Try organizing documents first using organize_documents tool',
+                  'Use absolute file paths if possible'
+                ],
                 timestamp: new Date().toISOString()
               }, null, 2)
             }
@@ -1667,20 +2134,29 @@ export class DocumentOrganizationServer {
         };
       }
 
+      // Enhanced consolidator configuration
       const consolidator = new ContentConsolidator({
         projectRoot: this.projectRoot,
-        syncHubPath: this.syncHub, // Use configured sync hub path
+        syncHubPath: this.syncHub,
         enhanceContent: enhance_with_ai,
         aiService: enhance_with_ai ? 'local' : 'none',
-        dryRun: dry_run
+        dryRun: dry_run,
+        batchMode: true, // Enable batch processing optimizations
+        maxConcurrency: 5 // Limit concurrent operations
       });
 
-      // Create consolidation candidate object with real analysis
+      // Create enhanced consolidation candidate object
       const consolidationCandidate = {
         topic,
-        files: analyzedFiles,
+        files: validFiles,
         recommendedTitle: `${topic} - Consolidated`,
-        consolidationStrategy: strategy
+        consolidationStrategy: strategy,
+        batchInfo: {
+          totalRequested: file_paths.length,
+          successfullyProcessed: validFiles.length,
+          errors: processingErrors.length,
+          unresolved: unresolvedFiles.length
+        }
       };
 
       const result = await consolidator.consolidateDocuments(consolidationCandidate);
@@ -1694,20 +2170,62 @@ export class DocumentOrganizationServer {
                 success: result.success,
                 target_folder: result.targetFolder,
                 consolidated_document: result.consolidatedDocument,
-                original_files: file_paths, // Use original relative paths
+                original_files: file_paths,
+                resolved_files: validFiles.map(f => f.filePath),
                 strategy_used: result.consolidationStrategy,
                 dry_run: dry_run
               },
+              batch_processing_summary: {
+                files_requested: file_paths.length,
+                files_successfully_consolidated: validFiles.length,
+                files_with_errors: processingErrors.length,
+                unresolved_files: unresolvedFiles.length,
+                success_rate: `${Math.round((validFiles.length / file_paths.length) * 100)}%`
+              },
+              processing_errors: processingErrors.length > 0 ? processingErrors : undefined,
+              unresolved_files: unresolvedFiles.length > 0 ? unresolvedFiles : undefined,
               topic,
-              files_consolidated: analyzedFiles.length,
-              files_requested: file_paths.length,
               timestamp: new Date().toISOString()
             }, null, 2)
           }
         ]
       };
     } catch (error) {
-      throw new Error(`Content consolidation failed: ${error.message}`);
+      await this.logError('Content consolidation failed with critical error', { 
+        topic, 
+        file_paths, 
+        strategy, 
+        enhance_with_ai, 
+        dry_run 
+      }, error);
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              success: false,
+              message: `Content consolidation failed: ${error.message}`,
+              error_type: error.constructor.name,
+              stack_trace: error.stack?.split('\n').slice(0, 5),
+              parameters: {
+                topic,
+                file_paths,
+                strategy,
+                enhance_with_ai,
+                dry_run
+              },
+              suggestions: [
+                'Check if all required modules are available',
+                'Verify file paths and permissions',
+                'Try with a smaller batch of files',
+                'Enable dry_run mode to test without making changes'
+              ],
+              timestamp: new Date().toISOString()
+            }, null, 2)
+          }
+        ]
+      };
     }
   }
 
@@ -1751,18 +2269,24 @@ export class DocumentOrganizationServer {
 
       // Recursively analyze files for poorly matched content
       const allFiles = [];
-      async function walk(dir) {
+      const walk = async (dir) => {
         const entries = await fs.readdir(dir, { withFileTypes: true });
         for (const entry of entries) {
-          const filePath = path.join(dir, entry.name);
+          const entryPath = path.join(dir, entry.name);
+          
+          // Skip Obsidian-related files and directories
+          if (this.isObsidianFile(entryPath)) {
+            continue;
+          }
+          
           if (entry.isDirectory() && !entry.name.startsWith('.')) {
-            await walk(filePath);
+            await walk(entryPath);
           } else if (entry.isFile() && !entry.name.startsWith('.')) {
             try {
-              const analysis = await analyzer.analyzeContent(filePath);
+              const analysis = await analyzer.analyzeContent(entryPath);
               if (analysis) {
                 const match = manager.findBestCategoryMatch(analysis);
-                allFiles.push({ filePath, analysis, match });
+                allFiles.push({ filePath: entryPath, analysis, match });
               }
             } catch (fileError) {
               await this.logError(`Error analyzing file for category suggestion: ${entry.name}`, {
@@ -1773,7 +2297,7 @@ export class DocumentOrganizationServer {
             }
           }
         }
-      }
+      };
       await walk(fullDirectoryPath);
 
       const poorlyMatched = allFiles.filter(f => f.match && f.match.confidence < 0.5);
@@ -1902,10 +2426,67 @@ export class DocumentOrganizationServer {
     return normalized;
   }
 
+  // Helper function to identify Obsidian-related files and folders that should be excluded from all operations
+  isObsidianFile(filePath) {
+    const fileName = path.basename(filePath);
+    const relativePath = path.relative(this.syncHub, filePath);
+    
+    // Obsidian directories to exclude
+    const obsidianDirectories = [
+      '.obsidian',
+      'plugins',
+      'themes',
+      '.trash'
+    ];
+    
+    // Obsidian files to exclude
+    const obsidianFiles = [
+      '.obsidian.vimrc',
+      'workspace.json',
+      'app.json',
+      'hotkeys.json',
+      'appearance.json',
+      'community-plugins.json',
+      'core-plugins.json',
+      'core-plugins-migration.json',
+      'graph.json',
+      'workspace-mobile.json'
+    ];
+    
+    // Check if the file/folder is in an Obsidian directory
+    for (const obsidianDir of obsidianDirectories) {
+      if (relativePath.startsWith(obsidianDir + '/') || relativePath === obsidianDir) {
+        return true;
+      }
+    }
+    
+    // Check if it's a specific Obsidian file
+    if (obsidianFiles.includes(fileName)) {
+      return true;
+    }
+    
+    // Check if filename starts with .obsidian
+    if (fileName.startsWith('.obsidian')) {
+      return true;
+    }
+    
+    // Check if it's in the root .obsidian directory
+    if (filePath.includes('/.obsidian/')) {
+      return true;
+    }
+    
+    return false;
+  }
+
   async deleteDocument(args) {
     const { file_path } = args;
     console.log(`[DELETE_DEBUG] Starting deleteDocument for: ${file_path}`);
     try {
+      // Check if this is an Obsidian-related file that should not be deleted
+      const fullPathForCheck = path.isAbsolute(file_path) ? file_path : path.join(this.syncHub, file_path);
+      if (this.isObsidianFile(fullPathForCheck)) {
+        throw new Error(`Cannot delete Obsidian-related file: ${file_path}. This file is protected to maintain vault integrity.`);
+      }
       // Always use directory listing approach to get exact filename
       const fullPath = path.isAbsolute(file_path) ? file_path : path.join(this.syncHub, file_path);
       const dirPath = path.dirname(fullPath);
@@ -2020,9 +2601,111 @@ export class DocumentOrganizationServer {
   async renameDocument(args) {
     const { old_file_path, new_file_name } = args;
     try {
-      const oldFullPath = path.isAbsolute(old_file_path) ? old_file_path : path.join(this.syncHub, old_file_path);
-      const newFullPath = path.join(path.dirname(oldFullPath), new_file_name);
-      await fs.rename(oldFullPath, newFullPath);
+      // Check if this is an Obsidian-related file that should not be renamed
+      const fullPathForCheck = path.isAbsolute(old_file_path) ? old_file_path : path.join(this.syncHub, old_file_path);
+      if (this.isObsidianFile(fullPathForCheck)) {
+        throw new Error(`Cannot rename Obsidian-related file: ${old_file_path}. This file is protected to maintain vault integrity.`);
+      }
+      // Use robust path resolution for special characters and Unicode
+      let actualOldPath;
+      const searchPaths = [
+        path.isAbsolute(old_file_path) ? old_file_path : null,
+        path.join(this.syncHub, old_file_path),
+        path.join(this.projectRoot, old_file_path),
+        path.join(this.syncHub, 'organized', old_file_path),
+        path.join(this.syncHub, path.basename(old_file_path))
+      ].filter(Boolean);
+
+      // First try simple access
+      for (const searchPath of searchPaths) {
+        try {
+          await fs.access(searchPath);
+          actualOldPath = searchPath;
+          break;
+        } catch {
+          continue;
+        }
+      }
+
+      // If simple access fails, use directory listing approach for special characters/Unicode
+      if (!actualOldPath) {
+        for (const searchPath of searchPaths) {
+          try {
+            const dirPath = path.dirname(searchPath);
+            const expectedFileName = path.basename(searchPath);
+            
+            // Check if directory exists first
+            try {
+              await fs.access(dirPath);
+            } catch {
+              continue;
+            }
+            
+            // Get actual files from directory to find exact match
+            const files = await fs.readdir(dirPath);
+            
+            // Find exact match by comparing the expected filename with actual files
+            const matchingFile = files.find(actualFile => {
+              // Direct match
+              if (actualFile === expectedFileName) {
+                return true;
+              }
+              
+              // Try character substitution for similar-looking Unicode characters
+              const normalizedActual = this.normalizeUnicodeChars(actualFile);
+              const normalizedExpected = this.normalizeUnicodeChars(expectedFileName);
+              if (normalizedActual === normalizedExpected) {
+                return true;
+              }
+              
+              // Try various Unicode normalizations
+              const normalizations = ['NFC', 'NFD', 'NFKC', 'NFKD'];
+              for (const norm of normalizations) {
+                if (actualFile.normalize(norm) === expectedFileName.normalize(norm)) {
+                  return true;
+                }
+                if (actualFile === expectedFileName.normalize(norm)) {
+                  return true;
+                }
+                if (actualFile.normalize(norm) === expectedFileName) {
+                  return true;
+                }
+                
+                // Try character substitution with Unicode normalization
+                const normActual = this.normalizeUnicodeChars(actualFile.normalize(norm));
+                const normExpected = this.normalizeUnicodeChars(expectedFileName.normalize(norm));
+                if (normActual === normExpected) {
+                  return true;
+                }
+              }
+              
+              return false;
+            });
+            
+            if (matchingFile) {
+              actualOldPath = path.join(dirPath, matchingFile);
+              // Verify the exact file can be accessed
+              try {
+                await fs.access(actualOldPath, fs.constants.F_OK);
+                break;
+              } catch {
+                actualOldPath = null;
+                continue;
+              }
+            }
+          } catch {
+            continue;
+          }
+        }
+      }
+
+      if (!actualOldPath) {
+        throw new Error(`Document not found: ${old_file_path}`);
+      }
+
+      const newFullPath = path.join(path.dirname(actualOldPath), new_file_name);
+      await fs.rename(actualOldPath, newFullPath);
+      
       return {
         content: [
           {
@@ -2041,77 +2724,7 @@ export class DocumentOrganizationServer {
     }
   }
 
-  async listFilesInCategory(args) {
-    try {
-      const { category } = args;
-      
-      if (!category || typeof category !== 'string') {
-        throw new Error('Category is required and must be a string');
-      }
 
-      const categoryPath = path.join(this.syncHub, category);
-      
-      try {
-        await fs.access(categoryPath);
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({
-                category,
-                files: [],
-                total_files: 0,
-                message: `Category '${category}' does not exist or is empty`,
-                timestamp: new Date().toISOString()
-              }, null, 2)
-            }
-          ]
-        };
-      }
-
-      const files = [];
-      
-      async function walk(dir) {
-        const entries = await fs.readdir(dir, { withFileTypes: true });
-        for (const entry of entries) {
-          const entryPath = path.join(dir, entry.name);
-          if (entry.isDirectory() && !entry.name.startsWith('.') && !entry.name.startsWith('_')) {
-            await walk(entryPath);
-          } else if (entry.isFile() && !entry.name.startsWith('.') && !entry.name.startsWith('_')) {
-            const stat = await fs.stat(entryPath);
-            const relativePath = path.relative(this.syncHub, entryPath);
-            files.push({
-              name: entry.name,
-              path: relativePath,
-              size: stat.size,
-              modified: stat.mtime.toISOString(),
-              extension: path.extname(entry.name)
-            });
-          }
-        }
-      }
-      
-      await walk(categoryPath);
-      
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify({
-              category,
-              files: files.sort((a, b) => a.name.localeCompare(b.name)),
-              total_files: files.length,
-              category_path: categoryPath,
-              timestamp: new Date().toISOString()
-            }, null, 2)
-          }
-        ]
-      };
-    } catch (error) {
-      throw new Error(`Failed to list files in category: ${error.message}`);
-    }
-  }
 
   async moveDocument(args) {
     try {
@@ -2134,17 +2747,124 @@ export class DocumentOrganizationServer {
         const results = [];
         for (const filePath of filePaths) {
           try {
-            const oldFullPath = path.isAbsolute(filePath) ? filePath : path.join(this.syncHub, filePath);
+            // Check if this is an Obsidian-related file that should not be moved
+            const fullPathForCheck = path.isAbsolute(filePath) ? filePath : path.join(this.syncHub, filePath);
+            if (this.isObsidianFile(fullPathForCheck)) {
+              results.push({
+                old_path: filePath,
+                error: `Cannot move Obsidian-related file: ${filePath}. This file is protected to maintain vault integrity.`,
+                moved: false
+              });
+              continue;
+            }
+            
+            // Use robust path resolution for special characters and Unicode
+            let actualOldPath;
+            const searchPaths = [
+              path.isAbsolute(filePath) ? filePath : null,
+              path.join(this.syncHub, filePath),
+              path.join(this.projectRoot, filePath),
+              path.join(this.syncHub, 'organized', filePath),
+              path.join(this.syncHub, path.basename(filePath))
+            ].filter(Boolean);
+
+            // First try simple access
+            for (const searchPath of searchPaths) {
+              try {
+                await fs.access(searchPath);
+                actualOldPath = searchPath;
+                break;
+              } catch {
+                continue;
+              }
+            }
+
+            // If simple access fails, use directory listing approach for special characters/Unicode
+            if (!actualOldPath) {
+              for (const searchPath of searchPaths) {
+                try {
+                  const dirPath = path.dirname(searchPath);
+                  const expectedFileName = path.basename(searchPath);
+                  
+                  // Check if directory exists first
+                  try {
+                    await fs.access(dirPath);
+                  } catch {
+                    continue;
+                  }
+                  
+                  // Get actual files from directory to find exact match
+                  const files = await fs.readdir(dirPath);
+                  
+                  // Find exact match by comparing the expected filename with actual files
+                  const matchingFile = files.find(actualFile => {
+                    // Direct match
+                    if (actualFile === expectedFileName) {
+                      return true;
+                    }
+                    
+                    // Try character substitution for similar-looking Unicode characters
+                    const normalizedActual = this.normalizeUnicodeChars(actualFile);
+                    const normalizedExpected = this.normalizeUnicodeChars(expectedFileName);
+                    if (normalizedActual === normalizedExpected) {
+                      return true;
+                    }
+                    
+                    // Try various Unicode normalizations
+                    const normalizations = ['NFC', 'NFD', 'NFKC', 'NFKD'];
+                    for (const norm of normalizations) {
+                      if (actualFile.normalize(norm) === expectedFileName.normalize(norm)) {
+                        return true;
+                      }
+                      if (actualFile === expectedFileName.normalize(norm)) {
+                        return true;
+                      }
+                      if (actualFile.normalize(norm) === expectedFileName) {
+                        return true;
+                      }
+                      
+                      // Try character substitution with Unicode normalization
+                      const normActual = this.normalizeUnicodeChars(actualFile.normalize(norm));
+                      const normExpected = this.normalizeUnicodeChars(expectedFileName.normalize(norm));
+                      if (normActual === normExpected) {
+                        return true;
+                      }
+                    }
+                    
+                    return false;
+                  });
+                  
+                  if (matchingFile) {
+                    actualOldPath = path.join(dirPath, matchingFile);
+                    // Verify the exact file can be accessed
+                    try {
+                      await fs.access(actualOldPath, fs.constants.F_OK);
+                      break;
+                    } catch {
+                      actualOldPath = null;
+                      continue;
+                    }
+                  }
+                } catch {
+                  continue;
+                }
+              }
+            }
+
+            if (!actualOldPath) {
+              throw new Error(`Document not found: ${filePath}`);
+            }
+            
             const newCategoryPath = path.join(this.syncHub, new_category);
             
             // Ensure new category directory exists
             await fs.mkdir(newCategoryPath, { recursive: true });
             
-            const fileName = path.basename(oldFullPath);
+            const fileName = path.basename(actualOldPath);
             const newFullPath = path.join(newCategoryPath, fileName);
             
             if (!dry_run) {
-              await fs.rename(oldFullPath, newFullPath);
+              await fs.rename(actualOldPath, newFullPath);
             }
             
             results.push({

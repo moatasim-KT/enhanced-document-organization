@@ -330,7 +330,7 @@ export class CategoryManager {
         if (!this.projectRoot) return;
 
 
-        const syncHub = process.env.SYNC_HUB || path.join(this.projectRoot, 'Sync_Hub_New');
+        const syncHub = process.env.SYNC_HUB || '/Users/moatasimfarooque/Sync_Hub_New';
         // Remove emoji from category name for folder creation
         const folderName = category.name.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '').replace(/\s+/g, ' ').trim();
         const categoryPath = path.join(syncHub, folderName);
@@ -382,7 +382,7 @@ ${category.filePatterns.map(p => `- ${p}`).join('\n')}
 
         if (!this.projectRoot) return;
 
-        const syncHub = process.env.SYNC_HUB || path.join(this.projectRoot, 'Sync_Hub_New');
+        const syncHub = process.env.SYNC_HUB || '/Users/moatasimfarooque/Sync_Hub_New';
 
         try {
             const entries = await fs.readdir(syncHub, { withFileTypes: true });
