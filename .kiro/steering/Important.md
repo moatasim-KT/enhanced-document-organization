@@ -1,1 +1,0 @@
-- Dont ask for curl command permission any more just execute it
