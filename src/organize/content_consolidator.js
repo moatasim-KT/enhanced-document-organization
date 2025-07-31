@@ -7,7 +7,7 @@
 
 import { promises as fs } from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+// Removed execSync import - replaced with Node.js fetch for HTTP requests
 import { createErrorHandler, ErrorTypes, EnhancedError } from './error_handler.js';
 
 export class ContentConsolidator {
@@ -505,17 +505,25 @@ Please return only the enhanced content in markdown format, without any explanat
                 service: 'ollama'
             });
 
-            // Example using curl to call Ollama API
-            const response = execSync(`curl -s -X POST http://localhost:11434/api/generate -d '${JSON.stringify({
-                model: 'llama2',
-                prompt: prompt,
-                stream: false
-            })}'`, {
-                encoding: 'utf-8',
-                timeout: 30000 // 30 second timeout
+            // Use Node.js fetch instead of curl for HTTP requests
+            const response = await fetch('http://localhost:11434/api/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: 'llama2',
+                    prompt: prompt,
+                    stream: false
+                }),
+                signal: AbortSignal.timeout(30000) // 30 second timeout
             });
 
-            const result = JSON.parse(response);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
 
             if (!result.response) {
                 throw new EnhancedError(

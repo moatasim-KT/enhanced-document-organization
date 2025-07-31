@@ -6,124 +6,62 @@
  */
 
 import { promises as fs } from 'fs';
-import { accessSync, existsSync, constants as fsConstants } from 'fs';
 import path from 'path';
-import os from 'os';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { SimplePathResolver, PathUtils } from './simple_path_resolver.js';
 
 export class ModuleLoader {
     constructor(options = {}) {
-        // Detect project root first (most reliable)
-        this.projectRoot = this.detectProjectRootFromFile();
-        
-        // Validate and set base directory
-        if (options.baseDir) {
-            // If baseDir is provided, ensure it's within the project root
-            const resolvedBaseDir = path.resolve(options.baseDir);
-            const expectedBaseDir = path.join(this.projectRoot, 'src', 'organize');
-            
-            // Only use provided baseDir if it's the correct organize directory
-            if (resolvedBaseDir === expectedBaseDir) {
-                this.baseDir = resolvedBaseDir;
-            } else {
-                console.warn(`[ModuleLoader] Invalid baseDir provided: ${resolvedBaseDir}`);
-                console.warn(`[ModuleLoader] Expected: ${expectedBaseDir}`);
-                console.warn(`[ModuleLoader] Using correct path instead`);
-                this.baseDir = expectedBaseDir;
-            }
-        } else {
-            // Default to organize folder within project root
-            this.baseDir = path.join(this.projectRoot, 'src', 'organize');
-        }
-        
+        // Use simplified path resolver
+        this.pathResolver = new SimplePathResolver(options);
+        this.projectRoot = this.pathResolver.projectRoot;
+
+        // Set up module directories for organize, sync, and mcp
+        this.srcDir = this.pathResolver.joinPaths(this.projectRoot, 'src');
+        this.moduleDirectories = {
+            organize: this.pathResolver.joinPaths(this.srcDir, 'organize'),
+            sync: this.pathResolver.joinPaths(this.srcDir, 'sync'),
+            mcp: this.pathResolver.joinPaths(this.srcDir, 'mcp')
+        };
+
+        // Set default base directory (can be overridden)
+        this.baseDir = options.baseDir
+            ? this.pathResolver.getAbsolutePath(options.baseDir)
+            : this.moduleDirectories.organize; // Default to organize for backward compatibility
+
         this.retryAttempts = options.retryAttempts || 3;
         this.retryDelay = options.retryDelay || 1000;
         this.moduleCache = new Map();
         this.failedModules = new Set();
-        
+
         console.log(`[ModuleLoader] Initialized with projectRoot: ${this.projectRoot}`);
+        console.log(`[ModuleLoader] Module directories:`, this.moduleDirectories);
         console.log(`[ModuleLoader] Base directory: ${this.baseDir}`);
     }
-    
+
     /**
      * Detect project root from the current file's location
      * NEVER allows defaulting to system root (/) to prevent permission issues
      */
     detectProjectRootFromFile() {
-        // Strategy 1: Use this file's location (most reliable)
-        if (import.meta.url) {
-            try {
-                const currentFileDir = path.dirname(new URL(import.meta.url).pathname);
-                // Navigate up from src/organize to project root
-                const potentialRoot = path.resolve(currentFileDir, '../../');
-                if (this.isProjectRoot(potentialRoot)) {
-                    console.log(`[ModuleLoader] Detected project root via import.meta.url: ${potentialRoot}`);
-                    return potentialRoot;
-                }
-            } catch (error) {
-                console.warn(`[ModuleLoader] import.meta.url detection failed: ${error.message}`);
-            }
-        }
-        
-        // Strategy 2: Known absolute path (most reliable fallback)
-        const knownProjectPath = '/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync';
-        if (this.isProjectRoot(knownProjectPath)) {
-            console.log(`[ModuleLoader] Using known absolute path: ${knownProjectPath}`);
-            return knownProjectPath;
-        }
-        
-        // Strategy 3: Comprehensive fallback strategies (NEVER allow system root)
-        const fallbacks = [
-            '/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync',
-            path.join(os.homedir(), 'Downloads/Programming/CascadeProjects/Drive_sync'),
-            path.join(os.homedir(), 'Downloads/Drive_sync'),
-            path.join(os.homedir(), 'Drive_sync')
-        ];
-        
-        console.warn(`[ModuleLoader] All detection strategies failed, trying fallbacks...`);
-        
-        for (const fallback of fallbacks) {
-            if (this.isProjectRoot(fallback)) {
-                console.log(`[ModuleLoader] Using fallback: ${fallback}`);
-                return fallback;
-            }
-        }
-        
-        // CRITICAL: Never return system root - use first known good path
-        const safeFallback = fallbacks[0];
-        console.error(`[ModuleLoader] CRITICAL: All fallbacks failed, using safe default: ${safeFallback}`);
-        return safeFallback;
+        // Delegate to simplified path resolver
+        return this.pathResolver.detectProjectRoot();
     }
-    
+
     /**
      * Check if a directory is likely the project root
      */
     isProjectRoot(dirPath) {
-        try {
-            // Primary indicators (any one of these is sufficient)
-            const primaryIndicators = [
-                path.join(dirPath, 'package.json'),
-                path.join(dirPath, '.git'),
-                path.join(dirPath, 'config', 'config.env')
-            ];
-            
-            for (const indicator of primaryIndicators) {
-                if (existsSync(indicator)) {
-                    return true;
-                }
-            }
-            
-            // Secondary indicators (need multiple)
-            const srcExists = existsSync(path.join(dirPath, 'src'));
-            const organizeExists = existsSync(path.join(dirPath, 'src', 'organize'));
-            
-            return srcExists && organizeExists;
-        } catch (error) {
-            return false;
+        if (!dirPath) return false;
+
+        // Check for package.json
+        const packageJsonPath = this.pathResolver.joinPaths(dirPath, 'package.json');
+        if (PathUtils.existsSync(packageJsonPath)) {
+            return true;
         }
+
+        // Check for config directory
+        const configPath = this.pathResolver.joinPaths(dirPath, 'config', 'config.env');
+        return PathUtils.existsSync(configPath);
     }
 
     /**
@@ -151,9 +89,9 @@ export class ModuleLoader {
         }
 
         const resolvedPath = this.resolvePath(modulePath);
-        
+
         // Convert to file:// URL for consistent import behavior
-        const importPath = path.isAbsolute(resolvedPath) 
+        const importPath = path.isAbsolute(resolvedPath)
             ? `file://${resolvedPath}`
             : resolvedPath;
 
@@ -162,15 +100,15 @@ export class ModuleLoader {
                 console.log(`[ModuleLoader] Attempting to import ${modulePath} (attempt ${attempt}/${this.retryAttempts}) for context: ${context}`);
                 console.log(`[ModuleLoader] Resolved path: ${resolvedPath}`);
                 console.log(`[ModuleLoader] Import path: ${importPath}`);
-                
+
                 // Validate module before import
                 await this.validateModule(resolvedPath);
-                
+
                 // Create timeout promise
                 const timeoutPromise = new Promise((_, reject) => {
                     setTimeout(() => reject(new Error(`Import timeout after ${timeout}ms`)), timeout);
                 });
-                
+
                 // Import with timeout using absolute file:// URL
                 const importPromise = import(importPath);
                 const module = await Promise.race([importPromise, timeoutPromise]);
@@ -224,49 +162,68 @@ export class ModuleLoader {
     }
 
     /**
-     * Resolve module path with different strategies
-     * Now uses project root for consistent resolution regardless of working directory
+     * Enhanced module path resolution supporting organize, sync, and mcp directories
      */
     resolvePath(modulePath) {
         // If already absolute or starts with protocol, return as-is
-        if (path.isAbsolute(modulePath) || modulePath.startsWith('file://') || modulePath.startsWith('http')) {
+        if (PathUtils.isAbsolute(modulePath) || modulePath.startsWith('file://') || modulePath.startsWith('http')) {
             return modulePath;
         }
 
         // If starts with './', resolve relative to base directory
         if (modulePath.startsWith('./') || modulePath.startsWith('../')) {
-            return path.resolve(this.baseDir, modulePath);
+            return this.pathResolver.resolvePath(modulePath, this.baseDir);
         }
 
-        // Try different resolution strategies, prioritizing project-root-based paths
-        // Always use project root to avoid working directory issues
+        // Check for module directory prefix (e.g., 'organize/error_handler', 'mcp/server')
+        const parts = modulePath.split('/');
+        const firstPart = parts[0];
+
+        if (this.moduleDirectories[firstPart]) {
+            // Module path specifies directory (e.g., 'mcp/server' or 'sync/sync_module')
+            const remainingPath = parts.slice(1).join('/');
+            const strategies = [
+                this.pathResolver.joinPaths(this.moduleDirectories[firstPart], remainingPath),
+                this.pathResolver.joinPaths(this.moduleDirectories[firstPart], `${remainingPath}.js`)
+            ];
+
+            for (const strategy of strategies) {
+                if (PathUtils.existsSync(strategy)) {
+                    return strategy;
+                }
+            }
+        }
+
+        // Try resolution strategies across all module directories
         const strategies = [
-            // Relative to project root + src/organize (most reliable for organize modules)
-            path.resolve(this.projectRoot, 'src', 'organize', modulePath),
-            path.resolve(this.projectRoot, 'src', 'organize', `${modulePath}.js`),
-            // Relative to project root for other modules
-            path.resolve(this.projectRoot, 'src', modulePath),
-            path.resolve(this.projectRoot, 'src', `${modulePath}.js`),
-            // Only use baseDir if it's actually the organize directory (not when cwd is wrong)
-            ...(this.baseDir.endsWith('src/organize') ? [
-                path.resolve(this.baseDir, modulePath),
-                path.resolve(this.baseDir, `${modulePath}.js`)
-            ] : []),
-            // Fallback to current directory (less reliable)
-            path.resolve(process.cwd(), modulePath),
+            // Current base directory first
+            this.pathResolver.joinPaths(this.baseDir, modulePath),
+            this.pathResolver.joinPaths(this.baseDir, `${modulePath}.js`),
+
+            // Then try all module directories
+            ...Object.values(this.moduleDirectories).flatMap(dir => [
+                this.pathResolver.joinPaths(dir, modulePath),
+                this.pathResolver.joinPaths(dir, `${modulePath}.js`)
+            ]),
+
+            // General src directory
+            this.pathResolver.joinPaths(this.srcDir, modulePath),
+            this.pathResolver.joinPaths(this.srcDir, `${modulePath}.js`),
+
             // As-is (for node_modules)
             modulePath
         ];
 
         for (const strategy of strategies) {
             try {
-                // For file paths, check if file exists using ES module compatible fs
+                // For file paths, check if file exists
                 if (strategy.endsWith('.js') || strategy.endsWith('.mjs')) {
-                    accessSync(strategy, fsConstants.F_OK);
+                    if (PathUtils.existsSync(strategy)) {
+                        return strategy;
+                    }
+                } else {
                     return strategy;
                 }
-                // For non-JS paths, return as-is
-                return strategy;
             } catch (error) {
                 // Continue to next strategy
             }
@@ -277,15 +234,17 @@ export class ModuleLoader {
     }
 
     /**
-     * Validate module before import
+     * Simple module validation
      */
     async validateModule(modulePath) {
         try {
             const resolvedPath = this.resolvePath(modulePath);
 
-            // For file paths, check if file exists and is readable
+            // For file paths, check if file exists
             if (resolvedPath.endsWith('.js') || resolvedPath.endsWith('.mjs')) {
-                await fs.access(resolvedPath, fs.constants.R_OK);
+                if (!(await this.pathResolver.fileExists(resolvedPath))) {
+                    throw new Error(`Module file not found: ${resolvedPath}`);
+                }
 
                 // Basic syntax check by reading file
                 const content = await fs.readFile(resolvedPath, 'utf8');
@@ -350,6 +309,90 @@ export class ModuleLoader {
     }
 
     /**
+     * Load module from organize directory
+     */
+    async loadOrganizeModule(moduleName, options = {}) {
+        const modulePath = `organize/${moduleName}`;
+        return this.safeImport(modulePath, {
+            ...options,
+            context: `organize-${moduleName}`
+        });
+    }
+
+    /**
+     * Load module from sync directory
+     */
+    async loadSyncModule(moduleName, options = {}) {
+        const modulePath = `sync/${moduleName}`;
+        return this.safeImport(modulePath, {
+            ...options,
+            context: `sync-${moduleName}`
+        });
+    }
+
+    /**
+     * Load module from mcp directory
+     */
+    async loadMcpModule(moduleName, options = {}) {
+        const modulePath = `mcp/${moduleName}`;
+        return this.safeImport(modulePath, {
+            ...options,
+            context: `mcp-${moduleName}`
+        });
+    }
+
+    /**
+     * Load modules from all directories
+     */
+    async loadModulesFromAllDirectories(moduleSpecs) {
+        const results = new Map();
+        const errors = [];
+
+        for (const [name, spec] of Object.entries(moduleSpecs)) {
+            try {
+                let module;
+
+                // Determine which directory to load from
+                if (spec.directory && this.moduleDirectories[spec.directory]) {
+                    const modulePath = `${spec.directory}/${spec.path || name}`;
+                    module = await this.safeImport(modulePath, {
+                        required: spec.required !== false,
+                        fallback: spec.fallback || null,
+                        context: `${spec.directory}-${name}`
+                    });
+                } else {
+                    // Use standard resolution
+                    module = await this.safeImport(spec.path || name, {
+                        required: spec.required !== false,
+                        fallback: spec.fallback || null,
+                        context: name
+                    });
+                }
+
+                if (module) {
+                    // Create instance if it's a class
+                    if (spec.instantiate && module[spec.className]) {
+                        results.set(name, new module[spec.className](spec.options || {}));
+                    } else if (spec.instantiate && module.default) {
+                        results.set(name, new module.default(spec.options || {}));
+                    } else {
+                        results.set(name, module);
+                    }
+                }
+            } catch (error) {
+                errors.push({ name, error: error.message });
+                console.error(`[ModuleLoader] Failed to load ${name}: ${error.message}`);
+
+                if (spec.required !== false) {
+                    throw new Error(`Required module ${name} failed to load: ${error.message}`);
+                }
+            }
+        }
+
+        return { results, errors };
+    }
+
+    /**
      * Get module loading statistics
      */
     getStats() {
@@ -357,7 +400,9 @@ export class ModuleLoader {
             cached: this.moduleCache.size,
             failed: this.failedModules.size,
             cachedModules: Array.from(this.moduleCache.keys()),
-            failedModules: Array.from(this.failedModules)
+            failedModules: Array.from(this.failedModules),
+            moduleDirectories: this.moduleDirectories,
+            baseDir: this.baseDir
         };
     }
 
@@ -382,74 +427,18 @@ export class ModuleLoader {
  */
 export class PathResolver {
     static resolveProjectRoot(startPath = process.cwd()) {
-        let currentPath = startPath;
-        const maxDepth = 10;
-
-        for (let i = 0; i < maxDepth; i++) {
-            // Look for package.json or config directory
-            const packageJsonPath = path.join(currentPath, 'package.json');
-            const configPath = path.join(currentPath, 'config');
-
-            try {
-                require('fs').accessSync(packageJsonPath);
-                return currentPath;
-            } catch (error) {
-                try {
-                    require('fs').accessSync(configPath);
-                    return currentPath;
-                } catch (error) {
-                    // Continue searching
-                }
-            }
-
-            const parentPath = path.dirname(currentPath);
-            if (parentPath === currentPath) {
-                // Reached filesystem root
-                break;
-            }
-            currentPath = parentPath;
-        }
-
-        // Fallback to current working directory
-        return process.cwd();
+        const resolver = new SimplePathResolver();
+        return resolver.detectProjectRoot();
     }
 
     static resolveModulePath(modulePath, baseDir = process.cwd()) {
-        if (path.isAbsolute(modulePath)) {
-            return modulePath;
-        }
-
-        // Handle relative paths
-        if (modulePath.startsWith('./') || modulePath.startsWith('../')) {
-            return path.resolve(baseDir, modulePath);
-        }
-
-        // Handle module names (try different locations)
-        const possiblePaths = [
-            path.resolve(baseDir, modulePath),
-            path.resolve(baseDir, 'src', modulePath),
-            path.resolve(baseDir, 'lib', modulePath),
-            path.resolve(baseDir, 'node_modules', modulePath)
-        ];
-
-        for (const possiblePath of possiblePaths) {
-            try {
-                require('fs').accessSync(possiblePath);
-                return possiblePath;
-            } catch (error) {
-                // Continue to next path
-            }
-        }
-
-        // Return original path as fallback
-        return modulePath;
+        const resolver = new SimplePathResolver();
+        return resolver.resolvePath(modulePath, baseDir);
     }
 
     static getAbsolutePath(relativePath, baseDir = process.cwd()) {
-        if (path.isAbsolute(relativePath)) {
-            return relativePath;
-        }
-        return path.resolve(baseDir, relativePath);
+        const resolver = new SimplePathResolver();
+        return resolver.getAbsolutePath(relativePath, baseDir);
     }
 }
 
@@ -459,57 +448,22 @@ export class PathResolver {
 export class ShellModuleLoader extends ModuleLoader {
     constructor(options = {}) {
         super(options);
-        this.projectRoot = options.projectRoot || PathResolver.resolveProjectRoot();
     }
 
     /**
-     * Load modules for shell script execution
+     * Load modules for shell script execution with support for all directories
      */
     async loadForShell(moduleSpecs, environment = {}) {
-        const loader = this;
-
         // Set up environment variables
         Object.entries(environment).forEach(([key, value]) => {
             process.env[key] = value;
         });
 
-        const results = {};
-        const errors = [];
-
-        for (const [name, spec] of Object.entries(moduleSpecs)) {
-            try {
-                const modulePath = this.resolveShellModulePath(spec.path);
-                const module = await loader.safeImport(modulePath, {
-                    required: spec.required !== false,
-                    fallback: spec.fallback || null,
-                    context: `shell-${name}`
-                });
-
-                if (module) {
-                    // Create instance if it's a class
-                    if (spec.instantiate && module[spec.className]) {
-                        results[name] = new module[spec.className](spec.options || {});
-                    } else if (spec.instantiate && module.default) {
-                        results[name] = new module.default(spec.options || {});
-                    } else {
-                        results[name] = module;
-                    }
-                }
-            } catch (error) {
-                errors.push({ name, error: error.message });
-                console.error(`[ShellModuleLoader] Failed to load ${name}: ${error.message}`);
-
-                if (spec.required !== false) {
-                    throw new Error(`Required module ${name} failed to load: ${error.message}`);
-                }
-            }
-        }
-
-        return { results, errors };
+        return this.loadModulesFromAllDirectories(moduleSpecs);
     }
 
     /**
-     * Resolve module path for shell context
+     * Resolve module path for shell context with environment variable support
      */
     resolveShellModulePath(modulePath) {
         // Handle environment variable substitution
@@ -517,12 +471,8 @@ export class ShellModuleLoader extends ModuleLoader {
             return process.env[varName] || match;
         });
 
-        // For relative paths starting with './', resolve relative to the organize directory
-        if (expandedPath.startsWith('./')) {
-            return path.resolve(this.baseDir, expandedPath);
-        }
-
-        return PathResolver.resolveModulePath(expandedPath, this.baseDir);
+        // Use the enhanced resolution from parent class
+        return this.resolvePath(expandedPath);
     }
 }
 

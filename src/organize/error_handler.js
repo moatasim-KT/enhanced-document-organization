@@ -6,9 +6,10 @@
  */
 
 import { promises as fs } from 'fs';
-import { accessSync, constants as fsConstants, readFileSync, existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 import os from 'os';
+import { SimplePathResolver, PathUtils } from './simple_path_resolver.js';
 
 /**
  * Error classification types
@@ -87,17 +88,19 @@ export class EnhancedError extends Error {
  */
 export class ErrorHandler {
     constructor(options = {}) {
-        this.projectRoot = options.projectRoot || this.detectProjectRoot();
-        
+        // Use simplified path resolver
+        this.pathResolver = new SimplePathResolver(options);
+        this.projectRoot = this.pathResolver.projectRoot;
+
         // Load configuration from config folder
         this.config = this.loadConfiguration();
-        
+
         // Set up logging directory (always within project, never in sync folder)
-        this.logDirectory = options.logDirectory || path.join(this.projectRoot, 'logs');
-        
+        this.logDirectory = options.logDirectory || this.pathResolver.joinPaths(this.projectRoot, 'logs');
+
         // Ensure sync folder is NEVER created in project directory
-        this.syncFolderPath = this.config.syncFolderPath || '/Users/moatasimfarooque/Sync_Hub_New';
-        
+        this.syncFolderPath = this.config.syncFolderPath || this.pathResolver.syncHubPath;
+
         this.component = options.component || 'system';
         this.enableConsoleLogging = options.enableConsoleLogging !== false;
         this.enableFileLogging = options.enableFileLogging !== false;
@@ -107,7 +110,7 @@ export class ErrorHandler {
 
         // Validate paths to prevent sync folder creation in project
         this.validatePaths();
-        
+
         // Ensure log directory exists
         this.ensureLogDirectory();
     }
@@ -117,199 +120,86 @@ export class ErrorHandler {
      * NEVER allows defaulting to system root (/) to prevent permission issues
      */
     detectProjectRoot() {
-        // Strategy 1: Use this file's location (most reliable)
-        if (import.meta.url) {
-            try {
-                const currentFileDir = path.dirname(new URL(import.meta.url).pathname);
-                // Navigate up from src/organize to project root
-                const potentialRoot = path.resolve(currentFileDir, '../../');
-                if (this.isProjectRoot(potentialRoot)) {
-                    console.log(`[ProjectRoot] Detected via import.meta.url: ${potentialRoot}`);
-                    return potentialRoot;
-                }
-            } catch (error) {
-                console.warn(`[ProjectRoot] import.meta.url detection failed: ${error.message}`);
-            }
-        }
-        
-        // Strategy 2: Known absolute path (most reliable fallback)
-        const knownProjectPath = '/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync';
-        if (this.isProjectRoot(knownProjectPath)) {
-            console.log(`[ProjectRoot] Using known absolute path: ${knownProjectPath}`);
-            return knownProjectPath;
-        }
-        
-        // Strategy 3: Search from current working directory
-        let currentDir = process.cwd();
-        console.log(`[ProjectRoot] Starting search from cwd: ${currentDir}`);
-        
-        const maxDepth = 10;
-        
-        // Search upward from current directory
-        for (let i = 0; i < maxDepth; i++) {
-            // Check if this directory has project indicators
-            if (this.isProjectRoot(currentDir)) {
-                return currentDir;
-            }
-            
-            const parentDir = path.dirname(currentDir);
-            
-            // Stop if we've reached the filesystem root or can't go higher
-            if (parentDir === currentDir || parentDir === '/') {
-                break;
-            }
-            
-            currentDir = parentDir;
-        }
-
-        // Strategy 4: Comprehensive fallback strategies (NEVER allow system root)
-        const fallbacks = [
-            // Primary: Known absolute path
-            '/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync',
-            
-            // Secondary: Search common locations
-            path.join(os.homedir(), 'Downloads/Programming/CascadeProjects/Drive_sync'),
-            path.join(os.homedir(), 'Downloads/Drive_sync'),
-            path.join(os.homedir(), 'Drive_sync'),
-            
-            // Tertiary: Safe fallback to user's home directory with a subdirectory
-            path.join(os.homedir(), '.drive_sync'),
-            
-            // Last resort: temp directory (but create project structure)
-            path.join(os.tmpdir(), 'drive_sync_fallback')
-        ];
-        
-        console.warn(`[ProjectRoot] All detection strategies failed, trying fallbacks...`);
-        
-        for (const fallback of fallbacks) {
-            console.log(`[ProjectRoot] Checking fallback: ${fallback}`);
-            if (this.isProjectRoot(fallback)) {
-                console.log(`[ProjectRoot] Using fallback: ${fallback}`);
-                return fallback;
-            }
-        }
-        
-        // CRITICAL: Never return system root - use first known good path
-        const safeFallback = fallbacks[0];
-        console.error(`[ProjectRoot] CRITICAL: All fallbacks failed, using safe default: ${safeFallback}`);
-        console.error(`[ProjectRoot] This may indicate a serious configuration issue`);
-        return safeFallback;
+        // Delegate to simplified path resolver
+        return this.pathResolver.detectProjectRoot();
     }
-    
+
     /**
      * Check if a directory is likely the project root
      */
     isProjectRoot(dirPath) {
-        try {
-            // Primary indicators (any one of these is sufficient)
-            const primaryIndicators = [
-                path.join(dirPath, 'package.json'),
-                path.join(dirPath, 'config', 'config.env')
-            ];
-            
-            for (const indicator of primaryIndicators) {
-                try {
-                    // Use synchronous access check
-                    accessSync(indicator, fsConstants.F_OK);
-                    
-                    // Additional validation: ensure it's not just a node_modules package.json
-                    if (indicator.endsWith('package.json')) {
-                        const parentDir = path.dirname(indicator);
-                        if (path.basename(parentDir) === 'node_modules' || 
-                            parentDir.includes('node_modules')) {
-                            continue;
-                        }
-                    }
-                    return true;
-                } catch (error) {
-                    // Continue checking other indicators
-                }
-            }
-            
-            // Secondary validation: check for src directory structure
-            const srcDir = path.join(dirPath, 'src');
-            const organizeDir = path.join(dirPath, 'src', 'organize');
-            
-            try {
-                accessSync(srcDir, fsConstants.F_OK);
-                accessSync(organizeDir, fsConstants.F_OK);
-                return true;
-            } catch (error) {
-                // Not a match
-            }
-            
-            return false;
-        } catch (error) {
-            return false;
+        if (!dirPath) return false;
+
+        // Check for package.json
+        const packageJsonPath = this.pathResolver.joinPaths(dirPath, 'package.json');
+        if (PathUtils.existsSync(packageJsonPath)) {
+            return true;
         }
+
+        // Check for config directory
+        const configPath = this.pathResolver.joinPaths(dirPath, 'config', 'config.env');
+        return PathUtils.existsSync(configPath);
     }
 
     /**
      * Load configuration from the config folder
      */
     loadConfiguration() {
-        const configDir = path.join(this.projectRoot, 'config');
-        const configFile = path.join(configDir, 'config.env');
-        
+        const configFile = this.pathResolver.joinPaths(this.projectRoot, 'config', 'config.env');
+
         try {
-            // Check if config directory exists
-            if (!existsSync(configDir)) {
-                console.warn(`Config directory not found: ${configDir}`);
-                return this.getDefaultConfig();
-            }
-            
             // Check if config file exists
-            if (!existsSync(configFile)) {
+            if (!this.pathResolver.fileExistsSync(configFile)) {
                 console.warn(`Config file not found: ${configFile}`);
                 return this.getDefaultConfig();
             }
-            
+
             // Read and parse config file
             const configContent = readFileSync(configFile, 'utf8');
             const config = this.parseConfigFile(configContent);
-            
+
             // Validate critical paths
-            if (config.syncFolderPath && config.syncFolderPath.startsWith(this.projectRoot)) {
+            if (config.syncFolderPath && this.pathResolver.isPathWithin(config.syncFolderPath, this.projectRoot)) {
                 console.error(`CRITICAL: Sync folder path cannot be within project directory!`);
                 console.error(`Project root: ${this.projectRoot}`);
                 console.error(`Sync folder path: ${config.syncFolderPath}`);
-                config.syncFolderPath = '/Users/moatasimfarooque/Sync_Hub_New';
+                config.syncFolderPath = this.pathResolver.syncHubPath;
             }
-            
+
             return config;
         } catch (error) {
             console.error(`Failed to load configuration: ${error.message}`);
             return this.getDefaultConfig();
         }
     }
-    
+
     /**
      * Parse configuration file content
      */
     parseConfigFile(content) {
         const config = {};
         const lines = content.split('\n');
-        
+
         for (const line of lines) {
             const trimmedLine = line.trim();
-            
+
             // Skip comments and empty lines
             if (!trimmedLine || trimmedLine.startsWith('#') || trimmedLine.startsWith('//')) {
                 continue;
             }
-            
+
             // Parse key=value pairs
             const equalIndex = trimmedLine.indexOf('=');
             if (equalIndex > 0) {
                 const key = trimmedLine.substring(0, equalIndex).trim();
                 let value = trimmedLine.substring(equalIndex + 1).trim();
-                
+
                 // Remove quotes if present
-                if ((value.startsWith('"') && value.endsWith('"')) || 
+                if ((value.startsWith('"') && value.endsWith('"')) ||
                     (value.startsWith("'") && value.endsWith("'"))) {
                     value = value.slice(1, -1);
                 }
-                
+
                 // Map common config keys
                 if (key.toLowerCase().includes('sync') && key.toLowerCase().includes('path')) {
                     config.syncFolderPath = value;
@@ -320,10 +210,10 @@ export class ErrorHandler {
                 }
             }
         }
-        
+
         return config;
     }
-    
+
     /**
      * Get default configuration
      */
@@ -333,43 +223,34 @@ export class ErrorHandler {
             logLevel: 'INFO'
         };
     }
-    
+
     /**
      * Validate paths to ensure sync folder is never in project directory
      */
     validatePaths() {
-        // Ensure sync folder path is absolute and outside project
-        if (this.syncFolderPath) {
-            const resolvedSyncPath = path.resolve(this.syncFolderPath);
-            const resolvedProjectPath = path.resolve(this.projectRoot);
-            
-            // Check if sync path is within project directory
-            if (resolvedSyncPath.startsWith(resolvedProjectPath)) {
-                console.error(`CRITICAL ERROR: Sync folder cannot be within project directory!`);
-                console.error(`Project root: ${resolvedProjectPath}`);
-                console.error(`Sync folder: ${resolvedSyncPath}`);
-                console.error(`Resetting sync folder to safe default.`);
-                this.syncFolderPath = '/Users/moatasimfarooque/Sync_Hub_New';
-            }
+        // Ensure sync folder path is outside project
+        if (this.syncFolderPath && this.pathResolver.isPathWithin(this.syncFolderPath, this.projectRoot)) {
+            console.error(`CRITICAL ERROR: Sync folder cannot be within project directory!`);
+            console.error(`Project root: ${this.projectRoot}`);
+            console.error(`Sync folder: ${this.syncFolderPath}`);
+            console.error(`Resetting sync folder to safe default.`);
+            this.syncFolderPath = this.pathResolver.syncHubPath;
         }
-        
+
         // Ensure log directory is within project (this is correct)
-        const resolvedLogPath = path.resolve(this.logDirectory);
-        const resolvedProjectPath = path.resolve(this.projectRoot);
-        
-        if (!resolvedLogPath.startsWith(resolvedProjectPath)) {
+        if (!this.pathResolver.isPathWithin(this.logDirectory, this.projectRoot)) {
             console.warn(`Log directory is outside project root, this may cause permission issues.`);
-            console.warn(`Project root: ${resolvedProjectPath}`);
-            console.warn(`Log directory: ${resolvedLogPath}`);
+            console.warn(`Project root: ${this.projectRoot}`);
+            console.warn(`Log directory: ${this.logDirectory}`);
         }
     }
-    
+
     /**
      * Ensure log directory exists
      */
     async ensureLogDirectory() {
         try {
-            await fs.mkdir(this.logDirectory, { recursive: true });
+            await this.pathResolver.ensureDirectory(this.logDirectory);
         } catch (error) {
             console.error(`Failed to create log directory: ${this.logDirectory}`, error);
         }
@@ -489,12 +370,12 @@ export class ErrorHandler {
     }
 
     /**
-     * Handle error with comprehensive processing
+     * Handle error with comprehensive processing and structured response
      */
     async handleError(error, context = {}) {
         // Preserve existing error type if it's already an EnhancedError
         const errorType = error.type || ErrorHandler.classifyError(error);
-        
+
         let enhancedError;
         if (error instanceof EnhancedError) {
             // If it's already an EnhancedError, preserve it but add context
@@ -512,22 +393,276 @@ export class ErrorHandler {
 
         const recoveryStrategy = ErrorHandler.createRecoveryStrategy(errorType, context);
 
-        // Log the error
-        await this.logError(enhancedError.message, enhancedError.context, enhancedError);
+        // Log the error with comprehensive details
+        await this.logError(enhancedError.message, {
+            ...enhancedError.context,
+            errorId: this.generateErrorId(enhancedError),
+            severity: this.determineSeverity(enhancedError, context),
+            category: errorType
+        }, enhancedError);
 
         // Log recovery strategy
         await this.logInfo(`Recovery strategy: ${recoveryStrategy.action} - ${recoveryStrategy.message}`, {
             errorType,
             retryable: recoveryStrategy.retryable,
-            fallback: recoveryStrategy.fallback
+            fallback: recoveryStrategy.fallback,
+            errorId: this.generateErrorId(enhancedError)
         });
 
         return {
             error: enhancedError,
             strategy: recoveryStrategy,
             shouldRetry: recoveryStrategy.retryable,
-            fallbackAction: recoveryStrategy.fallback
+            fallbackAction: recoveryStrategy.fallback,
+            errorId: this.generateErrorId(enhancedError),
+            severity: this.determineSeverity(enhancedError, context),
+            troubleshooting: this.generateTroubleshootingInfo(enhancedError, context)
         };
+    }
+
+    /**
+     * Generate unique error ID for tracking
+     */
+    generateErrorId(error) {
+        const timestamp = Date.now();
+        const errorHash = this.simpleHash(error.message + (error.stack || ''));
+        return `ERR_${this.component}_${timestamp}_${errorHash}`.substring(0, 32);
+    }
+
+    /**
+     * Determine error severity level
+     */
+    determineSeverity(error, context = {}) {
+        // Critical errors that prevent system operation
+        if (error.code === 'EACCES' || error.message?.includes('CRITICAL') ||
+            error.type === ErrorTypes.PERMISSION_DENIED) {
+            return 'critical';
+        }
+
+        // High severity for data loss or corruption risks
+        if (error.message?.includes('corrupt') || error.message?.includes('delete') ||
+            context.operation?.includes('delete') || context.operation?.includes('move') ||
+            error.type === ErrorTypes.CONFIGURATION_ERROR) {
+            return 'high';
+        }
+
+        // Medium severity for functional failures
+        if (error.code === 'ENOENT' || error.message?.includes('not found') ||
+            error.message?.includes('failed to') || error.type === ErrorTypes.FILE_NOT_FOUND ||
+            error.type === ErrorTypes.MODULE_IMPORT_FAILURE) {
+            return 'medium';
+        }
+
+        // Low severity for recoverable issues
+        if (error.message?.includes('warning') || error.message?.includes('skip') ||
+            error.type === ErrorTypes.VALIDATION_ERROR) {
+            return 'low';
+        }
+
+        return 'medium'; // Default
+    }
+
+    /**
+     * Generate comprehensive troubleshooting information
+     */
+    generateTroubleshootingInfo(error, context = {}) {
+        const errorType = error.type || ErrorHandler.classifyError(error);
+
+        return {
+            errorId: this.generateErrorId(error),
+            category: errorType,
+            commonCauses: this.getCommonCauses(errorType),
+            diagnosticSteps: this.getDiagnosticSteps(errorType, context),
+            preventionTips: this.getPreventionTips(errorType),
+            relatedDocumentation: this.getRelatedDocumentation(errorType),
+            supportInfo: {
+                component: this.component,
+                timestamp: new Date().toISOString(),
+                context: this.sanitizeContextForSupport(context)
+            }
+        };
+    }
+
+    /**
+     * Get common causes for error type
+     */
+    getCommonCauses(errorType) {
+        const causes = {
+            [ErrorTypes.FILE_NOT_FOUND]: [
+                'File was moved or deleted',
+                'Incorrect file path specified',
+                'File is in a different directory than expected',
+                'Permissions prevent file access'
+            ],
+            [ErrorTypes.PERMISSION_DENIED]: [
+                'Insufficient user permissions',
+                'File or directory is read-only',
+                'File is locked by another process',
+                'Security restrictions in place'
+            ],
+            [ErrorTypes.MODULE_IMPORT_FAILURE]: [
+                'Module not installed or missing',
+                'Incorrect import path',
+                'Version compatibility issues',
+                'Circular dependency problems'
+            ],
+            [ErrorTypes.CONFIGURATION_ERROR]: [
+                'Configuration file missing or corrupted',
+                'Invalid configuration values',
+                'Environment variables not set',
+                'Configuration format errors'
+            ],
+            [ErrorTypes.VALIDATION_ERROR]: [
+                'Required parameters missing',
+                'Invalid parameter types',
+                'Parameter values out of range',
+                'Malformed input data'
+            ],
+            [ErrorTypes.CONTENT_PROCESSING_ERROR]: [
+                'Content format not supported',
+                'Content is corrupted or malformed',
+                'Insufficient memory for processing',
+                'Content size exceeds limits'
+            ]
+        };
+
+        return causes[errorType] || ['Unknown cause - requires investigation'];
+    }
+
+    /**
+     * Get diagnostic steps for error type
+     */
+    getDiagnosticSteps(errorType, context) {
+        const steps = {
+            [ErrorTypes.FILE_NOT_FOUND]: [
+                'Verify the file path exists',
+                'Check parent directory permissions',
+                'List directory contents to confirm file location',
+                'Check if file was recently moved or deleted'
+            ],
+            [ErrorTypes.PERMISSION_DENIED]: [
+                'Check file/directory permissions',
+                'Verify current user has necessary access',
+                'Check if file is locked by another process',
+                'Try accessing with elevated permissions'
+            ],
+            [ErrorTypes.MODULE_IMPORT_FAILURE]: [
+                'Verify module is installed',
+                'Check import path syntax',
+                'Verify module version compatibility',
+                'Check for circular dependencies'
+            ],
+            [ErrorTypes.CONFIGURATION_ERROR]: [
+                'Check configuration file exists',
+                'Validate configuration syntax',
+                'Verify environment variables',
+                'Test with default configuration'
+            ],
+            [ErrorTypes.VALIDATION_ERROR]: [
+                'Review input parameters',
+                'Check parameter types and formats',
+                'Verify required fields are present',
+                'Test with minimal valid input'
+            ],
+            [ErrorTypes.CONTENT_PROCESSING_ERROR]: [
+                'Check content format and encoding',
+                'Verify content is not corrupted',
+                'Test with smaller content samples',
+                'Check available memory and resources'
+            ]
+        };
+
+        return steps[errorType] || ['Investigate error message and stack trace'];
+    }
+
+    /**
+     * Get prevention tips for error type
+     */
+    getPreventionTips(errorType) {
+        const tips = {
+            [ErrorTypes.FILE_NOT_FOUND]: [
+                'Use absolute paths when possible',
+                'Implement file existence checks before operations',
+                'Add file monitoring for critical files'
+            ],
+            [ErrorTypes.PERMISSION_DENIED]: [
+                'Set up proper file permissions during setup',
+                'Use user-writable directories for operations',
+                'Implement permission checks before operations'
+            ],
+            [ErrorTypes.MODULE_IMPORT_FAILURE]: [
+                'Add dependency checks during startup',
+                'Use package.json to manage dependencies',
+                'Implement graceful degradation for optional modules'
+            ],
+            [ErrorTypes.CONFIGURATION_ERROR]: [
+                'Validate configuration during startup',
+                'Provide default configuration values',
+                'Use configuration schema validation'
+            ],
+            [ErrorTypes.VALIDATION_ERROR]: [
+                'Add input validation at entry points',
+                'Provide clear parameter documentation',
+                'Use schema validation for complex inputs'
+            ],
+            [ErrorTypes.CONTENT_PROCESSING_ERROR]: [
+                'Add content format validation',
+                'Implement streaming for large content',
+                'Add memory usage monitoring'
+            ]
+        };
+
+        return tips[errorType] || ['Implement proper error handling and validation'];
+    }
+
+    /**
+     * Get related documentation for error type
+     */
+    getRelatedDocumentation(errorType) {
+        // This could be enhanced to return actual documentation links
+        return {
+            errorType,
+            documentation: [
+                'Check the component documentation',
+                'Review error handling best practices',
+                'Consult troubleshooting guides'
+            ]
+        };
+    }
+
+    /**
+     * Sanitize context for support reporting
+     */
+    sanitizeContextForSupport(context) {
+        const sanitized = { ...context };
+
+        // Remove sensitive information
+        const sensitiveKeys = ['password', 'token', 'key', 'secret', 'auth'];
+        sensitiveKeys.forEach(key => {
+            if (sanitized[key]) {
+                sanitized[key] = '[REDACTED]';
+            }
+        });
+
+        // Truncate large content
+        if (sanitized.content && sanitized.content.length > 500) {
+            sanitized.content = sanitized.content.substring(0, 500) + '... [truncated]';
+        }
+
+        return sanitized;
+    }
+
+    /**
+     * Simple hash function for ID generation
+     */
+    simpleHash(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+        return Math.abs(hash).toString(36);
     }
 
     /**
@@ -591,7 +726,7 @@ export class ErrorHandler {
      */
     getLogFilePath(level = 'main') {
         const timestamp = new Date().toISOString().split('T')[0];
-        return path.join(this.logDirectory, `${level.toLowerCase()}_${timestamp}.log`);
+        return this.pathResolver.joinPaths(this.logDirectory, `${level.toLowerCase()}_${timestamp}.log`);
     }
 
     /**

@@ -11,6 +11,7 @@ import path from 'path';
 export class CategoryManager {
     constructor(options = {}) {
         this.projectRoot = options.projectRoot;
+        this.syncHub = options.syncHub || process.env.SYNC_HUB || '/Users/moatasimfarooque/Sync_Hub_New';
         this.configPath = options.configPath || (this.projectRoot ? path.join(this.projectRoot, 'config', 'organize_config.conf') : 'config/organize_config.conf');
         this.categories = new Map();
         this.customCategories = new Map();
@@ -183,6 +184,7 @@ export class CategoryManager {
 
         await this.saveCategoriesToConfig();
         await this.createCategoryFolder(category);
+        await this.updateCategoryStats(); // Update stats after adding category
 
         console.log(`[INFO] Added custom category: ${category.name}`);
         return category;
@@ -329,11 +331,9 @@ export class CategoryManager {
 
         if (!this.projectRoot) return;
 
-
-        const syncHub = process.env.SYNC_HUB || '/Users/moatasimfarooque/Sync_Hub_New';
         // Remove emoji from category name for folder creation
         const folderName = category.name.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '').replace(/\s+/g, ' ').trim();
-        const categoryPath = path.join(syncHub, folderName);
+        const categoryPath = path.join(this.syncHub, folderName);
 
         try {
             await fs.mkdir(categoryPath, { recursive: true });
@@ -382,21 +382,20 @@ ${category.filePatterns.map(p => `- ${p}`).join('\n')}
 
         if (!this.projectRoot) return;
 
-        const syncHub = process.env.SYNC_HUB || '/Users/moatasimfarooque/Sync_Hub_New';
-
         try {
-            const entries = await fs.readdir(syncHub, { withFileTypes: true });
+            const entries = await fs.readdir(this.syncHub, { withFileTypes: true });
 
             for (const entry of entries) {
                 if (entry.isDirectory()) {
-                    const categoryPath = path.join(syncHub, entry.name);
-                    const files = await this.countFilesInCategory(categoryPath);
+                    const categoryPath = path.join(this.syncHub, entry.name);
+                    const stats = await this.countDocumentFoldersInCategory(categoryPath);
 
                     this.categoryStats.set(entry.name, {
                         name: entry.name,
-                        fileCount: files.fileCount,
-                        folderCount: files.folderCount,
-                        totalSize: files.totalSize,
+                        documentFolderCount: stats.documentFolderCount,
+                        fileCount: stats.fileCount, // Keep for backward compatibility
+                        folderCount: stats.folderCount,
+                        totalSize: stats.totalSize,
                         lastUpdated: new Date().toISOString()
                     });
                 }
@@ -407,9 +406,10 @@ ${category.filePatterns.map(p => `- ${p}`).join('\n')}
     }
 
     /**
-     * Count files in category
+     * Count document folders in category (folder-based architecture)
      */
-    async countFilesInCategory(categoryPath) {
+    async countDocumentFoldersInCategory(categoryPath) {
+        let documentFolderCount = 0;
         let fileCount = 0;
         let folderCount = 0;
         let totalSize = 0;
@@ -418,13 +418,28 @@ ${category.filePatterns.map(p => `- ${p}`).join('\n')}
             const entries = await fs.readdir(categoryPath, { withFileTypes: true });
 
             for (const entry of entries) {
-                if (entry.isDirectory()) {
-                    folderCount++;
-                    const subStats = await this.countFilesInCategory(path.join(categoryPath, entry.name));
-                    fileCount += subStats.fileCount;
-                    folderCount += subStats.folderCount;
-                    totalSize += subStats.totalSize;
-                } else {
+                if (entry.isDirectory() && !entry.name.startsWith('.') && !entry.name.startsWith('_')) {
+                    const entryPath = path.join(categoryPath, entry.name);
+
+                    // Check if this is a document folder
+                    if (await this.isDocumentFolder(entryPath)) {
+                        documentFolderCount++;
+
+                        // Count files within the document folder
+                        const folderStats = await this.countFilesInFolder(entryPath);
+                        fileCount += folderStats.fileCount;
+                        totalSize += folderStats.totalSize;
+                    } else {
+                        // Regular folder - recurse into it
+                        folderCount++;
+                        const subStats = await this.countDocumentFoldersInCategory(entryPath);
+                        documentFolderCount += subStats.documentFolderCount;
+                        fileCount += subStats.fileCount;
+                        folderCount += subStats.folderCount;
+                        totalSize += subStats.totalSize;
+                    }
+                } else if (entry.isFile() && !entry.name.startsWith('.') && !entry.name.startsWith('_')) {
+                    // Loose file in category (not in a document folder)
                     fileCount++;
                     const filePath = path.join(categoryPath, entry.name);
                     const stats = await fs.stat(filePath);
@@ -432,10 +447,81 @@ ${category.filePatterns.map(p => `- ${p}`).join('\n')}
                 }
             }
         } catch (error) {
-            // Ignore errors for individual files
+            // Ignore errors for individual files/folders
         }
 
-        return { fileCount, folderCount, totalSize };
+        return { documentFolderCount, fileCount, folderCount, totalSize };
+    }
+
+    /**
+     * Count files in a single folder
+     */
+    async countFilesInFolder(folderPath) {
+        let fileCount = 0;
+        let totalSize = 0;
+
+        try {
+            const entries = await fs.readdir(folderPath, { withFileTypes: true });
+
+            for (const entry of entries) {
+                const entryPath = path.join(folderPath, entry.name);
+
+                if (entry.isDirectory()) {
+                    // Recurse into subdirectories (like images folder)
+                    const subStats = await this.countFilesInFolder(entryPath);
+                    fileCount += subStats.fileCount;
+                    totalSize += subStats.totalSize;
+                } else if (entry.isFile()) {
+                    fileCount++;
+                    const stats = await fs.stat(entryPath);
+                    totalSize += stats.size;
+                }
+            }
+        } catch (error) {
+            // Ignore errors
+        }
+
+        return { fileCount, totalSize };
+    }
+
+    /**
+     * Check if a folder is a document folder (contains main document file)
+     */
+    async isDocumentFolder(folderPath) {
+        try {
+            const entries = await fs.readdir(folderPath);
+            const mainFileNames = ['main.md', 'document.md', 'index.md'];
+            const validExtensions = ['.md', '.txt'];
+
+            // Check for standard main file names
+            for (const mainFileName of mainFileNames) {
+                if (entries.includes(mainFileName)) {
+                    return true;
+                }
+            }
+
+            // Check for any markdown/text file
+            const hasDocumentFile = entries.some(file => {
+                const ext = path.extname(file).toLowerCase();
+                return validExtensions.includes(ext);
+            });
+
+            return hasDocumentFile;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    /**
+     * Count files in category (legacy method for backward compatibility)
+     */
+    async countFilesInCategory(categoryPath) {
+        const stats = await this.countDocumentFoldersInCategory(categoryPath);
+        return {
+            fileCount: stats.fileCount,
+            folderCount: stats.folderCount + stats.documentFolderCount,
+            totalSize: stats.totalSize
+        };
     }
 
     /**

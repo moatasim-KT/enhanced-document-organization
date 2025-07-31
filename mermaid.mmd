@@ -1,0 +1,21 @@
+graph TD
+    classDef opensource fill:#e6f9ff,stroke:#333,stroke-width:1px
+    classDef cloud fill:#f2ffe6,stroke:#333,stroke-width:1px
+    classDef enterprise fill:#ffe6f2,stroke:#333,stroke-width:1px
+
+    subgraph "Self-Hosted Open Source" 
+        Jenkins["Jenkins<br>Flexibility: ★★★★★<br>Learning Curve: ★★★☆☆<br>Enterprise Support: ★★★☆☆<br>Customization: ★★★★★<br>Community: ★★★★★"]
+        class Jenkins opensource
+        GitLab["GitLab CI<br>Flexibility: ★★★★☆<br>Learning Curve: ★★☆☆☆<br>Enterprise Support: ★★★★☆<br>Customization: ★★★★☆<br>Community: ★★★★☆"]:::opensource
+    end
+
+    subgraph "Cloud Services"
+        GHA["GitHub Actions<br>Flexibility: ★★★★☆<br>Learning Curve: ★★☆☆☆<br>Enterprise Support: ★★★☆☆<br>Customization: ★★★★☆<br>Integration: ★★★★★"]:::cloud
+        CircleCI["CircleCI<br>Flexibility: ★★★★☆<br>Learning Curve: ★★★☆☆<br>Enterprise Support: ★★★★☆<br>Customization: ★★★★☆<br>Scaling: ★★★★☆"]:::cloud
+        TravisCI["Travis CI<br>Flexibility: ★★★☆☆<br>Learning Curve: ★★☆☆☆<br>Enterprise Support: ★★★☆☆<br>Customization: ★★★☆☆<br>OSS Focus: ★★★★★"]:::cloud
+    end
+
+    subgraph "Enterprise Solutions"
+        TeamCity["TeamCity<br>Flexibility: ★★★★☆<br>Learning Curve: ★★★★☆<br>Enterprise Support: ★★★★★<br>Customization: ★★★★☆<br>Reliability: ★★★★★"]:::enterprise
+        AzureDevOps["Azure DevOps<br>Flexibility: ★★★★☆<br>Learning Curve: ★★★☆☆<br>Enterprise Support: ★★★★★<br>Customization: ★★★★☆<br>MS Integration: ★★★★★"]:::enterprise
+    end

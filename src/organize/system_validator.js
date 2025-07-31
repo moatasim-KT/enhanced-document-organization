@@ -7,7 +7,7 @@
 
 import { promises as fs, existsSync } from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+// Removed execSync import - replaced with Node.js fs operations
 import os from 'os';
 import { createErrorHandler, ErrorTypes, EnhancedError } from './error_handler.js';
 
@@ -43,7 +43,7 @@ export class SystemValidator {
             projectRoot: this.projectRoot,
             enableConsoleLogging: options.enableConsoleLogging !== false
         });
-        
+
         this.validationResults = [];
         this.criticalFailures = [];
         this.warnings = [];
@@ -70,14 +70,14 @@ export class SystemValidator {
                 console.warn(`[SystemValidator] import.meta.url detection failed: ${error.message}`);
             }
         }
-        
+
         // Strategy 2: Known absolute path (most reliable fallback)
         const knownProjectPath = '/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync';
         if (this.isProjectRoot(knownProjectPath)) {
             console.log(`[SystemValidator] Using known absolute path: ${knownProjectPath}`);
             return knownProjectPath;
         }
-        
+
         // Strategy 3: Comprehensive fallback strategies (NEVER allow system root)
         const fallbacks = [
             '/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync',
@@ -85,22 +85,22 @@ export class SystemValidator {
             path.join(os.homedir(), 'Downloads/Drive_sync'),
             path.join(os.homedir(), 'Drive_sync')
         ];
-        
+
         console.warn(`[SystemValidator] All detection strategies failed, trying fallbacks...`);
-        
+
         for (const fallback of fallbacks) {
             if (this.isProjectRoot(fallback)) {
                 console.log(`[SystemValidator] Using fallback: ${fallback}`);
                 return fallback;
             }
         }
-        
+
         // CRITICAL: Never return system root - use first known good path
         const safeFallback = fallbacks[0];
         console.error(`[SystemValidator] CRITICAL: All fallbacks failed, using safe default: ${safeFallback}`);
         return safeFallback;
     }
-    
+
     /**
      * Check if a directory is likely the project root
      */
@@ -112,17 +112,17 @@ export class SystemValidator {
                 path.join(dirPath, '.git'),
                 path.join(dirPath, 'config', 'config.env')
             ];
-            
+
             for (const indicator of primaryIndicators) {
                 if (existsSync(indicator)) {
                     return true;
                 }
             }
-            
+
             // Secondary indicators (need multiple)
             const srcExists = existsSync(path.join(dirPath, 'src'));
             const organizeExists = existsSync(path.join(dirPath, 'src', 'organize'));
-            
+
             return srcExists && organizeExists;
         } catch (error) {
             return false;
@@ -258,14 +258,41 @@ export class SystemValidator {
      */
     async checkCommand(command, versionFlag, displayName, options = {}) {
         try {
-            const output = execSync(`${command} ${versionFlag}`, { 
-                encoding: 'utf8',
-                timeout: 5000,
-                stdio: ['ignore', 'pipe', 'ignore']
-            }).trim();
+            // Use Node.js spawn instead of execSync for better error handling
+            const { spawn } = await import('child_process');
+
+            const output = await new Promise((resolve, reject) => {
+                const child = spawn(command, [versionFlag], {
+                    stdio: ['ignore', 'pipe', 'ignore'],
+                    timeout: 5000
+                });
+
+                let stdout = '';
+                child.stdout.on('data', (data) => {
+                    stdout += data.toString();
+                });
+
+                child.on('close', (code) => {
+                    if (code === 0) {
+                        resolve(stdout.trim());
+                    } else {
+                        reject(new Error(`Command exited with code ${code}`));
+                    }
+                });
+
+                child.on('error', (error) => {
+                    reject(error);
+                });
+
+                // Handle timeout
+                setTimeout(() => {
+                    child.kill();
+                    reject(new Error('Command timeout'));
+                }, 5000);
+            });
 
             const version = this.extractVersion(output);
-            
+
             this.addResult(
                 options.category || ValidationCategories.DEPENDENCIES,
                 displayName,
@@ -290,7 +317,7 @@ export class SystemValidator {
 
         } catch (error) {
             const status = options.required ? ValidationStatus.FAIL : ValidationStatus.WARN;
-            const message = options.required 
+            const message = options.required
                 ? `${displayName} is required but not available`
                 : `${displayName} is not available (optional)`;
 
@@ -299,8 +326,8 @@ export class SystemValidator {
                 displayName,
                 status,
                 message,
-                { 
-                    command, 
+                {
+                    command,
                     error: error.message,
                     installHint: options.installHint
                 }
@@ -337,15 +364,15 @@ export class SystemValidator {
     compareVersions(version1, version2) {
         const v1Parts = version1.split('.').map(Number);
         const v2Parts = version2.split('.').map(Number);
-        
+
         for (let i = 0; i < Math.max(v1Parts.length, v2Parts.length); i++) {
             const v1Part = v1Parts[i] || 0;
             const v2Part = v2Parts[i] || 0;
-            
+
             if (v1Part > v2Part) return 1;
             if (v1Part < v2Part) return -1;
         }
-        
+
         return 0;
     }
 
@@ -439,14 +466,14 @@ export class SystemValidator {
     async checkFileExists(filePath, displayName, options = {}) {
         try {
             await fs.access(filePath);
-            
+
             const stats = await fs.stat(filePath);
             this.addResult(
                 options.category || ValidationCategories.PATHS,
                 displayName,
                 ValidationStatus.PASS,
                 `${displayName} exists and is accessible`,
-                { 
+                {
                     path: filePath,
                     size: stats.size,
                     modified: stats.mtime.toISOString()
@@ -494,7 +521,7 @@ export class SystemValidator {
             await fs.mkdir(dir, { recursive: true });
 
             let defaultContent = '';
-            
+
             if (filePath.endsWith('config.env')) {
                 defaultContent = this.getDefaultConfigEnv();
             } else if (filePath.endsWith('organize_config.conf')) {
@@ -654,7 +681,7 @@ enable_duplicate_detection = true
     async checkDirectoryExists(dirPath, displayName, options = {}) {
         try {
             const stats = await fs.stat(dirPath);
-            
+
             if (stats.isDirectory()) {
                 this.addResult(
                     ValidationCategories.PATHS,
@@ -752,7 +779,7 @@ enable_duplicate_detection = true
             await fs.access(checkPath);
 
             const permissionChecks = [];
-            
+
             for (const permission of requiredPermissions) {
                 try {
                     switch (permission) {
@@ -775,7 +802,7 @@ enable_duplicate_detection = true
             }
 
             const deniedPermissions = permissionChecks.filter(p => p.status === 'DENIED');
-            
+
             if (deniedPermissions.length === 0) {
                 this.addResult(
                     ValidationCategories.PERMISSIONS,
@@ -838,7 +865,7 @@ enable_duplicate_detection = true
             try {
                 const moduleUrl = `file://${path.resolve(modulePath)}`;
                 await import(moduleUrl);
-                
+
                 this.addResult(
                     ValidationCategories.MODULES,
                     displayName,
@@ -907,7 +934,7 @@ enable_duplicate_detection = true
         try {
             // Use statvfs if available (more portable than statfs)
             let stats = null;
-            
+
             try {
                 // Try to use statvfs first
                 if (fs.statvfs) {
@@ -916,21 +943,46 @@ enable_duplicate_detection = true
                     stats = await fs.statfs(this.projectRoot);
                 }
             } catch (fsError) {
-                // Fall back to using df command on Unix-like systems
+                // Fall back to using Node.js spawn instead of execSync
                 try {
-                    const { execSync } = await import('child_process');
-                    const dfOutput = execSync(`df -h "${this.projectRoot}"`, { 
-                        encoding: 'utf8',
-                        timeout: 5000 
+                    const { spawn } = await import('child_process');
+
+                    const dfOutput = await new Promise((resolve, reject) => {
+                        const child = spawn('df', ['-h', this.projectRoot], {
+                            stdio: ['ignore', 'pipe', 'ignore'],
+                            timeout: 5000
+                        });
+
+                        let stdout = '';
+                        child.stdout.on('data', (data) => {
+                            stdout += data.toString();
+                        });
+
+                        child.on('close', (code) => {
+                            if (code === 0) {
+                                resolve(stdout.trim());
+                            } else {
+                                reject(new Error(`df command exited with code ${code}`));
+                            }
+                        });
+
+                        child.on('error', (error) => {
+                            reject(error);
+                        });
+
+                        setTimeout(() => {
+                            child.kill();
+                            reject(new Error('df command timeout'));
+                        }, 5000);
                     });
-                    
+
                     const lines = dfOutput.trim().split('\n');
                     if (lines.length >= 2) {
                         const parts = lines[1].split(/\s+/);
                         if (parts.length >= 4) {
                             const availableStr = parts[3];
                             const freeSpaceGB = this.parseStorageSize(availableStr);
-                            
+
                             if (freeSpaceGB > 1) {
                                 this.addResult(
                                     ValidationCategories.SYSTEM,
@@ -955,7 +1007,7 @@ enable_duplicate_detection = true
                     // df command failed, continue to skip
                 }
             }
-            
+
             if (stats && stats.bavail && stats.bsize) {
                 const freeSpaceGB = (stats.bavail * stats.bsize) / (1024 * 1024 * 1024);
                 const totalSpaceGB = (stats.blocks * stats.bsize) / (1024 * 1024 * 1024);
@@ -1003,10 +1055,10 @@ enable_duplicate_detection = true
     parseStorageSize(sizeStr) {
         const match = sizeStr.match(/^(\d+(?:\.\d+)?)\s*([KMGT]?)$/i);
         if (!match) return 0;
-        
+
         const value = parseFloat(match[1]);
         const unit = match[2].toUpperCase();
-        
+
         switch (unit) {
             case 'T': return value * 1024;
             case 'G': return value;
@@ -1126,9 +1178,34 @@ enable_duplicate_detection = true
                 );
             }
 
-            // Check for Xcode Command Line Tools
+            // Check for Xcode Command Line Tools using spawn instead of execSync
             try {
-                execSync('xcode-select -p', { stdio: 'ignore' });
+                const { spawn } = await import('child_process');
+
+                await new Promise((resolve, reject) => {
+                    const child = spawn('xcode-select', ['-p'], {
+                        stdio: ['ignore', 'ignore', 'ignore'],
+                        timeout: 5000
+                    });
+
+                    child.on('close', (code) => {
+                        if (code === 0) {
+                            resolve();
+                        } else {
+                            reject(new Error(`xcode-select exited with code ${code}`));
+                        }
+                    });
+
+                    child.on('error', (error) => {
+                        reject(error);
+                    });
+
+                    setTimeout(() => {
+                        child.kill();
+                        reject(new Error('xcode-select timeout'));
+                    }, 5000);
+                });
+
                 this.addResult(
                     ValidationCategories.SYSTEM,
                     'Xcode Command Line Tools',
@@ -1233,10 +1310,10 @@ enable_duplicate_detection = true
      */
     printReport() {
         const summary = this.generateValidationSummary();
-        
+
         console.log('\n🔍 System Validation Report');
-        console.log('=' .repeat(50));
-        
+        console.log('='.repeat(50));
+
         console.log(`\nOverall Status: ${this.getStatusIcon(summary.overallStatus === 'PASSED' ? ValidationStatus.PASS : summary.overallStatus === 'WARNING' ? ValidationStatus.WARN : ValidationStatus.FAIL)} ${summary.overallStatus}`);
         console.log(`Total Checks: ${summary.totalChecks}`);
         console.log(`✅ Passed: ${summary.passed}`);
@@ -1286,11 +1363,11 @@ enable_duplicate_detection = true
 export async function validateSystem(options = {}) {
     const validator = new SystemValidator(options);
     const result = await validator.validateSystem();
-    
+
     if (options.printReport !== false) {
         validator.printReport();
     }
-    
+
     return result;
 }
 

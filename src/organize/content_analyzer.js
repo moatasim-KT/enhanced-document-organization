@@ -19,6 +19,7 @@ export class ContentAnalyzer {
 
     /**
      * Analyze content for duplicates and similarities
+     * Enhanced to understand document folder structure
      */
     async analyzeContent(filePath) {
         const content = await this.readFile(filePath);
@@ -36,12 +37,141 @@ export class ContentAnalyzer {
             metadata: this.extractMetadata(content, filePath)
         };
 
+        // Check if this file is part of a document folder structure
+        const parentDir = path.dirname(filePath);
+        const fileName = path.basename(filePath);
+        const parentDirName = path.basename(parentDir);
+
+        // Detect if this is likely a main document file in a document folder
+        const isLikelyMainFile = this.isLikelyMainDocumentFile(fileName, parentDirName);
+        if (isLikelyMainFile) {
+            analysis.isMainDocumentFile = true;
+            analysis.documentFolderName = parentDirName;
+
+            // Check for images folder
+            const imagesFolder = path.join(parentDir, 'images');
+            try {
+                const imagesStat = await fs.stat(imagesFolder);
+                if (imagesStat.isDirectory()) {
+                    const imageFiles = await fs.readdir(imagesFolder);
+                    analysis.hasImagesFolder = true;
+                    analysis.imageCount = imageFiles.filter(f => !f.startsWith('.')).length;
+                }
+            } catch (error) {
+                analysis.hasImagesFolder = false;
+                analysis.imageCount = 0;
+            }
+        } else {
+            analysis.isMainDocumentFile = false;
+            analysis.hasImagesFolder = false;
+            analysis.imageCount = 0;
+        }
+
         this.contentCache.set(filePath, analysis);
         return analysis;
     }
 
     /**
+     * Check if a file is likely a main document file in a document folder
+     */
+    isLikelyMainDocumentFile(fileName, parentDirName) {
+        const baseName = path.basename(fileName, path.extname(fileName)).toLowerCase();
+        const parentName = parentDirName.toLowerCase();
+
+        // Standard main file names
+        const mainFileNames = ['main', 'document', 'index', 'readme'];
+        if (mainFileNames.includes(baseName)) {
+            return true;
+        }
+
+        // File name matches parent directory name
+        if (baseName === parentName || baseName.replace(/[-_]/g, '') === parentName.replace(/[-_]/g, '')) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Analyze a document folder as a complete unit
+     */
+    async analyzeDocumentFolder(folderPath, mainFilePath) {
+        const analysis = await this.analyzeContent(mainFilePath);
+        if (!analysis) {
+            return null;
+        }
+
+        // Enhance with folder-specific information
+        analysis.documentFolderPath = folderPath;
+        analysis.isDocumentFolder = true;
+
+        // Analyze images folder if it exists
+        const imagesFolder = path.join(folderPath, 'images');
+        try {
+            const imagesStat = await fs.stat(imagesFolder);
+            if (imagesStat.isDirectory()) {
+                const imageFiles = await fs.readdir(imagesFolder);
+                const validImages = imageFiles.filter(f => !f.startsWith('.') && this.isImageFile(f));
+
+                analysis.hasImagesFolder = true;
+                analysis.imageCount = validImages.length;
+                analysis.imageFiles = validImages;
+
+                // Analyze image references in content
+                const content = await this.readFile(mainFilePath);
+                analysis.imageReferences = this.extractImageReferences(content);
+                analysis.hasOrphanedImages = validImages.length > analysis.imageReferences.length;
+            }
+        } catch (error) {
+            analysis.hasImagesFolder = false;
+            analysis.imageCount = 0;
+            analysis.imageFiles = [];
+            analysis.imageReferences = [];
+            analysis.hasOrphanedImages = false;
+        }
+
+        return analysis;
+    }
+
+    /**
+     * Check if a file is an image file
+     */
+    isImageFile(fileName) {
+        const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp'];
+        const ext = path.extname(fileName).toLowerCase();
+        return imageExtensions.includes(ext);
+    }
+
+    /**
+     * Extract image references from markdown content
+     */
+    extractImageReferences(content) {
+        const imageRefs = [];
+
+        // Match markdown image syntax: ![alt](path)
+        const markdownImages = content.match(/!\[.*?\]\([^)]+\)/g) || [];
+        markdownImages.forEach(match => {
+            const pathMatch = match.match(/!\[.*?\]\(([^)]+)\)/);
+            if (pathMatch) {
+                imageRefs.push(pathMatch[1]);
+            }
+        });
+
+        // Match HTML img tags
+        const htmlImages = content.match(/<img[^>]+src=["']([^"']+)["'][^>]*>/gi) || [];
+        htmlImages.forEach(match => {
+            const srcMatch = match.match(/src=["']([^"']+)["']/i);
+            if (srcMatch) {
+                imageRefs.push(srcMatch[1]);
+            }
+        });
+
+        return imageRefs;
+    }
+
+    /**
      * Find duplicate content across files
+     * Enhanced to handle document folders
      */
     async findDuplicates(fileList) {
         const duplicates = new Map();
@@ -72,11 +202,24 @@ export class ContentAnalyzer {
         // Group exact duplicates
         for (const [hash, files] of hashGroups) {
             if (files.length > 1) {
+                // Determine recommended action based on document folder status
+                let recommendedAction = 'merge_or_delete';
+                const hasDocumentFolders = files.some(f => f.analysis.isMainDocumentFile);
+                const hasImages = files.some(f => f.analysis.imageCount > 0);
+
+                if (hasDocumentFolders && hasImages) {
+                    recommendedAction = 'merge_document_folders_preserve_images';
+                } else if (hasDocumentFolders) {
+                    recommendedAction = 'merge_document_folders';
+                }
+
                 duplicates.set(`exact_${hash}`, {
                     type: 'exact',
                     similarity: 1.0,
                     files: files,
-                    recommendedAction: 'merge_or_delete'
+                    recommendedAction,
+                    involvesDocumentFolders: hasDocumentFolders,
+                    involvesImages: hasImages
                 });
             }
         }
@@ -88,6 +231,18 @@ export class ContentAnalyzer {
                 const similarity = this.calculateSimilarity(analyzedArray[i], analyzedArray[j]);
                 if (similarity >= this.similarityThreshold) {
                     const key = `similar_${i}_${j}`;
+
+                    // Determine recommended action based on document folder status
+                    let recommendedAction = similarity > 0.95 ? 'merge' : 'consolidate';
+                    const hasDocumentFolders = analyzedArray[i].isMainDocumentFile || analyzedArray[j].isMainDocumentFile;
+                    const hasImages = (analyzedArray[i].imageCount || 0) > 0 || (analyzedArray[j].imageCount || 0) > 0;
+
+                    if (hasDocumentFolders && similarity > 0.95) {
+                        recommendedAction = hasImages ? 'merge_document_folders_preserve_images' : 'merge_document_folders';
+                    } else if (hasDocumentFolders) {
+                        recommendedAction = 'consolidate_document_folders';
+                    }
+
                     duplicates.set(key, {
                         type: 'similar',
                         similarity,
@@ -95,7 +250,9 @@ export class ContentAnalyzer {
                             { filePath: analyzedArray[i].filePath, analysis: analyzedArray[i] },
                             { filePath: analyzedArray[j].filePath, analysis: analyzedArray[j] }
                         ],
-                        recommendedAction: similarity > 0.95 ? 'merge' : 'consolidate'
+                        recommendedAction,
+                        involvesDocumentFolders: hasDocumentFolders,
+                        involvesImages: hasImages
                     });
                 }
             }
