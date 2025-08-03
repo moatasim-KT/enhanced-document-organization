@@ -220,3 +220,4 @@ id_ed25519
 logs
 ~/.unison
 ~/
+.*
