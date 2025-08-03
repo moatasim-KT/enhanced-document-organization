@@ -116,7 +116,6 @@ Desktop.ini
 
 # Obsidian configuration (if synced accidentally)
 .obsidian/
-plugins/
 .obsidian.vimrc
 workspace.json
 app.json
@@ -338,7 +337,6 @@ Desktop.ini
 
 # Obsidian configuration (if synced accidentally)
 .obsidian/
-plugins/
 .obsidian.vimrc
 workspace.json
 app.json
@@ -347,7 +345,8 @@ appearance.json
 community-plugins.json
 core-plugins.json
 core-plugins-migration.json
-
+# Allow plugins directory
+!src/plugins/
 # Cache directories
 .cache/
 .npm/

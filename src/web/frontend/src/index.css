@@ -1,0 +1,313 @@
+/* Tailwind CSS imports */
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* Base styles */
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  body {
+    background-color: rgb(249 250 251); /* bg-gray-50 */
+    color: rgb(17 24 39); /* text-gray-900 */
+  }
+}
+
+/* Component styles */
+@layer components {
+  .btn {
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: colors 0.15s ease-in-out;
+    outline: none;
+  }
+  
+  .btn:focus {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5), 0 0 0 4px rgba(59, 130, 246, 0.2);
+  }
+  
+  .btn-primary {
+    background-color: rgb(37 99 235); /* bg-blue-600 */
+    color: white;
+  }
+  
+  .btn-primary:hover {
+    background-color: rgb(29 78 216); /* bg-blue-700 */
+  }
+  
+  .btn-primary:focus {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5), 0 0 0 4px rgba(59, 130, 246, 0.2);
+  }
+  
+  .btn-secondary {
+    background-color: rgb(229 231 235); /* bg-gray-200 */
+    color: rgb(17 24 39); /* text-gray-900 */
+  }
+  
+  .btn-secondary:hover {
+    background-color: rgb(209 213 219); /* bg-gray-300 */
+  }
+  
+  .btn-secondary:focus {
+    box-shadow: 0 0 0 2px rgba(107, 114, 128, 0.5), 0 0 0 4px rgba(107, 114, 128, 0.2);
+  }
+  
+  .btn-danger {
+    background-color: rgb(220 38 38); /* bg-red-600 */
+    color: white;
+  }
+  
+  .btn-danger:hover {
+    background-color: rgb(185 28 28); /* bg-red-700 */
+  }
+  
+  .btn-danger:focus {
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.5), 0 0 0 4px rgba(239, 68, 68, 0.2);
+  }
+  
+  .card {
+    background-color: white;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    border: 1px solid rgb(229 231 235);
+    padding: 1.5rem;
+  }
+  
+  .input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid rgb(209 213 219);
+    border-radius: 0.5rem;
+    outline: none;
+  }
+  
+  .input:focus {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+    border-color: transparent;
+  }
+  
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: 0.5rem;
+    transition: colors 0.15s ease-in-out;
+  }
+  
+  .sidebar-item-active {
+    background-color: rgb(219 234 254); /* bg-blue-100 */
+    color: rgb(29 78 216); /* text-blue-700 */
+  }
+  
+  .sidebar-item-inactive {
+    color: rgb(75 85 99); /* text-gray-600 */
+  }
+  
+  .sidebar-item-inactive:hover {
+    background-color: rgb(243 244 246); /* bg-gray-100 */
+    color: rgb(17 24 39); /* text-gray-900 */
+  }
+}
+
+@layer utilities {
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  .animate-bounce-subtle {
+    animation: bounce-subtle 2s infinite;
+  }
+  
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+  
+  .animate-shimmer {
+    animation: shimmer 2s linear infinite;
+  }
+  
+  .glass-effect {
+    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+  
+  .gradient-border {
+    background: linear-gradient(45deg, #3b82f6, #8b5cf6, #06b6d4);
+    background-size: 300% 300%;
+    animation: gradient-shift 3s ease infinite;
+  }
+  
+  .hover-lift {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+  
+  .slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  .bounce-subtle {
+    animation: bounce-subtle 1.5s ease-in-out infinite;
+  }
+  
+  .glow {
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+  
+  .shimmer {
+    animation: shimmer 2s linear infinite;
+  }
+  
+  .gradient-shift {
+    animation: gradient-shift 3s ease infinite;
+  }
+
+  /* Responsive utilities */
+  .mobile-only {
+    display: block;
+  }
+
+  .desktop-only {
+    display: none;
+  }
+
+  @media (min-width: 768px) {
+    .mobile-only {
+      display: none;
+    }
+    
+    .desktop-only {
+      display: block;
+    }
+  }
+
+  /* Touch-friendly buttons */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Mobile-optimized form inputs */
+  .mobile-input {
+    font-size: 16px; /* Prevents zoom on iOS */
+    padding: 12px 16px;
+    border-radius: 8px;
+  }
+
+  /* Responsive text sizes */
+  .text-responsive-sm {
+    font-size: 0.875rem;
+  }
+
+  .text-responsive-base {
+    font-size: 1rem;
+  }
+
+  .text-responsive-lg {
+    font-size: 1.125rem;
+  }
+
+  @media (min-width: 640px) {
+    .text-responsive-sm {
+      font-size: 1rem;
+    }
+    
+    .text-responsive-base {
+      font-size: 1.125rem;
+    }
+    
+    .text-responsive-lg {
+      font-size: 1.25rem;
+    }
+  }
+
+  /* Mobile-first spacing */
+  .spacing-mobile {
+    padding: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .spacing-mobile {
+      padding: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .spacing-mobile {
+      padding: 2rem;
+    }
+  }
+
+  /* Safe area support for mobile devices */
+  .safe-area-inset {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Smooth scrolling */
+  .smooth-scroll {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Mobile modal optimizations */
+  .mobile-modal {
+    margin: 0;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  @media (min-width: 640px) {
+    .mobile-modal {
+      margin: 2rem;
+      height: auto;
+      max-height: calc(100vh - 4rem);
+      border-radius: 0.5rem;
+    }
+  }
+
+  @keyframes bounce-subtle {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+
+  @keyframes glow {
+    0% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); }
+    100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.8); }
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  @keyframes gradient-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+}

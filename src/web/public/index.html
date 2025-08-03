@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drive Sync Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 3rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 600px;
+            width: 90%;
+        }
+        
+        .logo {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 1rem;
+            font-size: 2.5rem;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 2rem;
+            font-size: 1.2rem;
+        }
+        
+        .status {
+            background: #e8f5e8;
+            color: #2d5a2d;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            font-weight: 500;
+        }
+        
+        .api-info {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            text-align: left;
+        }
+        
+        .api-info h3 {
+            color: #333;
+            margin-bottom: 1rem;
+        }
+        
+        .endpoint {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            padding: 0.5rem;
+            margin: 0.5rem 0;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.9rem;
+        }
+        
+        .method {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-weight: bold;
+            margin-right: 0.5rem;
+            font-size: 0.8rem;
+        }
+        
+        .get { background: #e8f4fd; color: #1976d2; }
+        .post { background: #e8f5e8; color: #2e7d32; }
+        .put { background: #fff3e0; color: #f57c00; }
+        .delete { background: #ffebee; color: #d32f2f; }
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+        
+        .feature {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .feature-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .feature h4 {
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+        
+        .feature p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .coming-soon {
+            background: #fff3cd;
+            color: #856404;
+            padding: 0.5rem;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🚀</div>
+        <h1>Drive Sync Dashboard</h1>
+        <p class="subtitle">AI-Powered Document Organization System</p>
+        
+        <div class="status">
+            ✅ Backend API Server is Running
+        </div>
+        
+        <div class="api-info">
+            <h3>Available API Endpoints</h3>
+            
+            <div class="endpoint">
+                <span class="method post">POST</span> /api/auth/login
+            </div>
+            <div class="endpoint">
+                <span class="method get">GET</span> /api/documents/search?q=query
+            </div>
+            <div class="endpoint">
+                <span class="method post">POST</span> /api/documents/
+            </div>
+            <div class="endpoint">
+                <span class="method get">GET</span> /api/organization/stats
+            </div>
+            <div class="endpoint">
+                <span class="method get">GET</span> /api/organization/categories
+            </div>
+            <div class="endpoint">
+                <span class="method post">POST</span> /api/sync/start
+            </div>
+            <div class="endpoint">
+                <span class="method get">GET</span> /api/system/status
+            </div>
+            <div class="endpoint">
+                <span class="method get">GET</span> /health
+            </div>
+        </div>
+        
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">📄</div>
+                <h4>Document Management</h4>
+                <p>Create, search, organize, and manage documents with AI-powered categorization</p>
+            </div>
+            
+            <div class="feature">
+                <div class="feature-icon">☁️</div>
+                <h4>Cloud Sync</h4>
+                <p>Seamless synchronization with iCloud and Google Drive</p>
+            </div>
+            
+            <div class="feature">
+                <div class="feature-icon">🤖</div>
+                <h4>AI Organization</h4>
+                <p>Intelligent document categorization and content analysis</p>
+            </div>
+            
+            <div class="feature">
+                <div class="feature-icon">🔌</div>
+                <h4>Plugin System</h4>
+                <p>Extensible architecture for custom functionality</p>
+                <div class="coming-soon">Coming Soon</div>
+            </div>
+            
+            <div class="feature">
+                <div class="feature-icon">🧠</div>
+                <h4>Advanced AI</h4>
+                <p>Enhanced AI handling with Groq fallback support</p>
+                <div class="coming-soon">Coming Soon</div>
+            </div>
+            
+            <div class="feature">
+                <div class="feature-icon">📚</div>
+                <h4>Version Control</h4>
+                <p>Document history tracking and versioning</p>
+                <div class="coming-soon">Coming Soon</div>
+            </div>
+        </div>
+        
+        <div style="margin-top: 2rem; color: #666; font-size: 0.9rem;">
+            <p>WebSocket available at: <code>ws://localhost:3000/ws</code></p>
+            <p>API Documentation: <code>http://localhost:3000/api</code></p>
+        </div>
+    </div>
+    
+    <script>
+        // Simple WebSocket connection test
+        const ws = new WebSocket('ws://localhost:3000/ws');
+        
+        ws.onopen = function() {
+            console.log('✅ WebSocket connected');
+            ws.send(JSON.stringify({ type: 'ping' }));
+        };
+        
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            console.log('📨 WebSocket message:', data);
+        };
+        
+        ws.onerror = function(error) {
+            console.log('❌ WebSocket error:', error);
+        };
+        
+        // Test API endpoint
+        fetch('/health')
+            .then(response => response.json())
+            .then(data => {
+                console.log('✅ Health check:', data);
+            })
+            .catch(error => {
+                console.log('❌ Health check failed:', error);
+            });
+    </script>
+</body>
+</html>
