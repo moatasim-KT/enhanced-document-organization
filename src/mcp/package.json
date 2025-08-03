@@ -1,0 +1,64 @@
+{
+    "name": "enhanced-document-organization-mcp",
+    "version": "1.0.0",
+    "description": "Model Context Protocol server for enhanced document organization system",
+    "main": "server.js",
+    "type": "module",
+    "bin": {
+        "enhanced-document-organization-mcp": "./server.js"
+    },
+    "scripts": {
+        "start": "node server.js",
+        "test": "echo \"Testing MCP server...\" && node server.js --test"
+    },
+    "keywords": [
+        "mcp",
+        "model-context-protocol",
+        "document-organization",
+        "ai-assistant",
+        "sync",
+        "automation"
+    ],
+    "author": "Enhanced Document Organization System",
+    "license": "MIT",
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^0.4.0"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    },
+    "repository": {
+        "type": "git",
+        "url": "local"
+    },
+    "mcp": {
+        "server": {
+            "name": "enhanced-document-organization",
+            "version": "1.0.0",
+            "description": "Provides AI assistants access to organized documents through Model Context Protocol",
+            "capabilities": [
+                "create_conversation_session",
+                "store_conversation",
+                "get_conversation_history",
+                "get_conversation_summary",
+                "store_user_preference",
+                "get_user_preference",
+                "search_documents",
+                "get_document_content",
+                "organize_documents",
+                "sync_documents",
+                "get_organization_stats",
+                "list_categories",
+                "create_document"
+            ],
+            "resources": {
+                "documents": {
+                    "description": "Access to all organized markdown documents",
+                    "patterns": [
+                        "file://**/*.md"
+                    ]
+                }
+            }
+        }
+    }
+}

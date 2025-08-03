@@ -1,0 +1,157 @@
+# Unison profile template for iCloud sync
+# Copy this file to unison_icloud.prf and customize with your personal paths
+# Syncs between local sync hub and iCloud (Obsidian documents)
+
+# Sync directories
+# Replace with your actual sync hub path
+root = /Users/YOUR_USERNAME/Sync_Hub_New
+# Replace with your actual iCloud path
+root = /Users/YOUR_USERNAME/Library/Mobile Documents/iCloud~md~obsidian/Documents/Sync
+
+# Basic sync options
+auto = true
+batch = true
+prefer = newer
+log = true
+silent = false
+
+# Conflict resolution
+backup = Name *
+backupcurr = Name *
+backupnot = Name *.tmp
+maxbackups = 5
+
+# Standard ignore patterns
+ignore = Name .DS_Store
+ignore = Name .localized
+ignore = Name .Spotlight-V100
+ignore = Name .Trashes
+ignore = Name .fseventsd
+ignore = Name .TemporaryItems
+ignore = Name *.tmp
+ignore = Name *.swp
+ignore = Name *~
+ignore = Name .#*
+ignore = Name #*#
+
+# iCloud specific ignores
+ignore = Name *.icloud
+ignore = Name .com.apple.timemachine.donotpresent
+
+# Obsidian specific ignores
+ignore = Name .obsidian
+ignore = Path .obsidian/*
+ignore = Name plugins
+ignore = Path plugins/*
+ignore = Name .obsidian.vimrc
+ignore = Name workspace.json
+ignore = Name app.json
+ignore = Name hotkeys.json
+ignore = Name appearance.json
+ignore = Name community-plugins.json
+ignore = Name core-plugins.json
+ignore = Name core-plugins-migration.json
+
+# Common problematic file patterns
+ignore = Regex .*:.*
+ignore = Regex .*".*
+ignore = Regex .*<.*
+ignore = Regex .*>.*
+ignore = Regex .*\|.*
+ignore = Name *.lock
+ignore = Name *.lnk
+ignore = Name desktop.ini
+ignore = Name Thumbs.db
+ignore = Name *conflicted copy*
+ignore = Name *conflict*
+
+# Version control and sync service files
+ignore = Name .git
+ignore = Name .gitignore
+ignore = Name .sync*
+ignore = Name .dropbox*
+ignore = Name .cache
+
+# Application-specific configuration files and directories (be selective)
+ignore = Name .obsidian
+ignore = Name .smart-env
+ignore = Name .vscode
+ignore = Name .idea
+ignore = Path .obsidian
+ignore = Path */.obsidian  
+ignore = Path .smart-env
+ignore = Path */.smart-env
+ignore = Path .vscode
+ignore = Path */.vscode
+ignore = Path .git
+ignore = Path */.git
+
+# Only ignore specific hidden files that cause problems (not all hidden files)
+ignore = Name .DS_Store
+ignore = Name .localized
+ignore = Name .Spotlight-V100
+ignore = Name .Trashes
+ignore = Name .fseventsd
+ignore = Name .TemporaryItems
+
+# Performance settings
+retry = 3
+confirmbigdel = false
+
+times = true
+perms = 0o644
+
+# Performance optimizations for large datasets
+maxthreads = 4
+rsrc = false
+
+# Exclude large file types that slow down sync
+ignore = Name *.mp4
+ignore = Name *.mov
+ignore = Name *.epub
+ignore = Name *.zip
+ignore = Name *.tar.gz
+ignore = Name *.dmg
+
+# Exclude common large directories
+ignore = Path converted_images
+ignore = Path */converted_images
+ignore = Path random_forest_images
+ignore = Path */random_forest_images
+ignore = Path extracted_images
+ignore = Path */extracted_images
+ignore = Path images
+ignore = Path */images
+ignore = Path media
+ignore = Path */media
+
+# Exclude temporary and cache directories
+ignore = Path .obsidian/plugins/*/
+ignore = Path .smart-env
+ignore = Path */cache
+ignore = Path */temp
+ignore = Path */tmp
+ignore = Path */.cache
+ignore = Path */.tmp
+ignore = Path */.temp
+
+# Additional ignore patterns for unwanted system files
+ignore = Name .kiro
+ignore = Path .kiro/*
+ignore = Name .npm
+ignore = Path .npm/*
+ignore = Name .cache
+ignore = Path .cache/*
+ignore = Name .local
+ignore = Path .local/*
+ignore = Name .codeium
+ignore = Path .codeium/*
+ignore = Name node_modules
+ignore = Path node_modules/*
+ignore = Path */node_modules/*
+
+# Network optimization
+# servercmd = timeout 60s unison  # Disabled - causes syntax issues
+# clientHostName = localhost
+
+# Backup and versioning

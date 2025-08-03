@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- LaunchAgent configuration template for Enhanced Document Organization -->
+    <!-- Copy this file to com.moatasim.enhanced-document-organization.plist and customize -->
+    
+    <!-- Service identifier - keep this unique -->
+    <key>Label</key>
+    <string>com.moatasim.enhanced-document-organization</string>
+    
+    <!-- Program to execute -->
+    <key>ProgramArguments</key>
+    <array>
+        <!-- Replace with your actual project path -->
+        <string>/Users/YOUR_USERNAME/Downloads/Programming/CascadeProjects/Drive_sync/drive_sync.sh</string>
+    </array>
+    
+    <!-- Working directory -->
+    <key>WorkingDirectory</key>
+    <!-- Replace with your actual project path -->
+    <string>/Users/YOUR_USERNAME/Downloads/Programming/CascadeProjects/Drive_sync</string>
+    
+    <!-- Run at load -->
+    <key>RunAtLoad</key>
+    <true/>
+    
+    <!-- Keep alive -->
+    <key>KeepAlive</key>
+    <false/>
+    
+    <!-- Start interval (in seconds) - adjust as needed -->
+    <key>StartInterval</key>
+    <integer>1800</integer> <!-- 30 minutes -->
+    
+    <!-- Standard output log -->
+    <key>StandardOutPath</key>
+    <!-- Replace with your actual project path -->
+    <string>/Users/YOUR_USERNAME/Downloads/Programming/CascadeProjects/Drive_sync/logs/launchagent.log</string>
+    
+    <!-- Standard error log -->
+    <key>StandardErrorPath</key>
+    <!-- Replace with your actual project path -->
+    <string>/Users/YOUR_USERNAME/Downloads/Programming/CascadeProjects/Drive_sync/logs/launchagent_error.log</string>
+    
+    <!-- Environment variables -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <!-- Replace with your actual home directory -->
+        <key>HOME</key>
+        <string>/Users/YOUR_USERNAME</string>
+        
+        <!-- Path environment -->
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        
+        <!-- Node.js path (if using Node.js) -->
+        <key>NODE_PATH</key>
+        <string>/usr/local/lib/node_modules</string>
+    </dict>
+    
+    <!-- Process type -->
+    <key>ProcessType</key>
+    <string>Background</string>
+    
+    <!-- Low priority -->
+    <key>LowPriorityIO</key>
+    <true/>
+    
+    <!-- Nice value (lower priority) -->
+    <key>Nice</key>
+    <integer>1</integer>
+    
+    <!-- Throttle interval -->
+    <key>ThrottleInterval</key>
+    <integer>60</integer> <!-- 1 minute minimum between runs -->
+    
+    <!-- Exit timeout -->
+    <key>ExitTimeOut</key>
+    <integer>300</integer> <!-- 5 minutes -->
+    
+    <!-- Disabled by default (enable after customization) -->
+    <key>Disabled</key>
+    <true/>
+    
+    <!-- Additional settings for reliability -->
+    <key>AbandonProcessGroup</key>
+    <true/>
+    
+    <!-- Limit load averages -->
+    <key>LimitLoadToHosts</key>
+    <array>
+        <string>localhost</string>
+    </array>
+    
+    <!-- Only run when user is logged in -->
+    <key>LimitLoadToSessionType</key>
+    <array>
+        <string>Aqua</string>
+    </array>
+</dict>
+</plist>

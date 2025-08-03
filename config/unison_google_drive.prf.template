@@ -1,0 +1,152 @@
+# Unison profile template for Google Drive sync
+# Copy this file to unison_google_drive.prf and customize with your personal paths
+# Syncs between local sync hub and Google Drive
+
+# Sync directories
+# Replace with your actual sync hub path
+root = /Users/YOUR_USERNAME/Sync_Hub_New
+# Replace YOUR_EMAIL with your actual Google account email
+root = /Users/YOUR_USERNAME/Library/CloudStorage/GoogleDrive-YOUR_EMAIL@gmail.com/My Drive/Sync
+
+# Basic sync options
+auto = true
+batch = true
+prefer = newer
+log = true
+silent = false
+
+# Conflict resolution
+
+# Standard ignore patterns
+ignore = Name .DS_Store
+ignore = Name .localized
+ignore = Name .Spotlight-V100
+ignore = Name .Trashes
+ignore = Name .fseventsd
+ignore = Name .TemporaryItems
+ignore = Name *.tmp
+ignore = Name *.swp
+ignore = Name *~
+ignore = Name .#*
+ignore = Name #*#
+
+# Google Drive specific ignores
+ignore = Name *.gdoc
+ignore = Name *.gsheet
+ignore = Name *.gslides
+ignore = Name .tmp.driveupload
+ignore = Name .tmp.drivedownload
+
+# Obsidian specific ignores
+ignore = Name .obsidian
+ignore = Path .obsidian/*
+ignore = Name plugins
+ignore = Path plugins/*
+ignore = Name .obsidian.vimrc
+ignore = Name workspace.json
+ignore = Name app.json
+ignore = Name hotkeys.json
+ignore = Name appearance.json
+ignore = Name community-plugins.json
+ignore = Name core-plugins.json
+ignore = Name core-plugins-migration.json
+
+# Common problematic file patterns
+ignore = Regex .*:.*
+ignore = Regex .*".*
+ignore = Regex .*<.*
+ignore = Regex .*>.*
+ignore = Regex .*\|.*
+ignore = Name *.lock
+ignore = Name *.lnk
+ignore = Name desktop.ini
+ignore = Name Thumbs.db
+ignore = Name *conflicted copy*
+ignore = Name *conflict*
+
+# Version control and sync service files
+ignore = Name .git
+ignore = Name .gitignore
+ignore = Name .sync*
+ignore = Name .dropbox*
+
+# Application-specific configuration files and directories (be selective)
+ignore = Name .obsidian
+ignore = Name .smart-env
+ignore = Name .vscode
+ignore = Name .idea
+ignore = Path .obsidian
+ignore = Path */.obsidian  
+ignore = Path .smart-env
+ignore = Path */.smart-env
+ignore = Path .vscode
+ignore = Path */.vscode
+ignore = Path .git
+ignore = Path */.git
+
+# Only ignore specific hidden files that cause problems (not all hidden files)
+ignore = Name .DS_Store
+ignore = Name .localized
+ignore = Name .Spotlight-V100
+ignore = Name .Trashes
+ignore = Name .fseventsd
+ignore = Name .TemporaryItems
+
+# Performance settings
+retry = 3
+confirmbigdel = false
+
+times = true
+perms = 0o644
+
+# Performance optimizations for large datasets
+maxthreads = 4
+rsrc = false
+
+# Exclude large file types that slow down sync
+ignore = Name *.pdf
+ignore = Name *.PNG
+ignore = Name *.png
+ignore = Name *.jpg
+ignore = Name *.jpeg
+ignore = Name *.mp4
+ignore = Name *.mov
+ignore = Name *.epub
+ignore = Name *.zip
+ignore = Name *.tar.gz
+ignore = Name *.dmg
+
+# Exclude common large directories
+ignore = Path media
+ignore = Path */media
+
+# Exclude temporary and cache directories
+ignore = Path .obsidian/plugins/*/
+ignore = Path .smart-env
+ignore = Path */cache
+ignore = Path */temp
+ignore = Path */tmp
+ignore = Path */.cache
+ignore = Path */.tmp
+ignore = Path */.temp
+
+# Additional ignore patterns for unwanted system files
+ignore = Name .kiro
+ignore = Path .kiro/*
+ignore = Name .npm
+ignore = Path .npm/*
+ignore = Name .cache
+ignore = Path .cache/*
+ignore = Name .local
+ignore = Path .local/*
+ignore = Name .codeium
+ignore = Path .codeium/*
+ignore = Name node_modules
+ignore = Path node_modules/*
+ignore = Path */node_modules/*
+
+# Network optimization
+# servercmd = timeout 60s unison  # Disabled - causes syntax issues
+# clientHostName = localhost
+
+# Backup and versioning

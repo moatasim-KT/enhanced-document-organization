@@ -1,0 +1,193 @@
+# Enhanced Document Organization Configuration Template
+# Copy this file to organize_config.conf and customize with your settings
+
+# ============================================================================
+# BASIC ORGANIZATION SETTINGS
+# ============================================================================
+
+# Enable/disable automatic organization
+auto_organize=true
+
+# Create categories automatically
+create_categories=true
+
+# Move files to organized folders
+move_files=true
+
+# Backup files before moving
+backup_before_move=true
+
+# ============================================================================
+# PATH CONFIGURATION
+# ============================================================================
+
+# Base sync hub directory (should match config.env)
+# Replace with your actual sync hub path
+sync_hub=/Users/YOUR_USERNAME/Sync_Hub_New
+
+# Organized folders structure
+organized_root=${sync_hub}/Organized
+
+# Categories directory
+categories_dir=${organized_root}/Categories
+
+# Uncategorized files directory
+uncategorized_dir=${organized_root}/Uncategorized
+
+# ============================================================================
+# CATEGORY SETTINGS
+# ============================================================================
+
+# Default category for unclassified files
+default_category=Uncategorized
+
+# Maximum number of categories to create
+max_categories=20
+
+# Maximum category depth (nested folders)
+category_depth=3
+
+# Category naming convention
+# Options: snake_case, kebab-case, PascalCase, Title Case
+category_naming=Title Case
+
+# ============================================================================
+# FILE PROCESSING
+# ============================================================================
+
+# Maximum file size to process (in MB)
+max_file_size=50
+
+# Supported file extensions (comma-separated)
+supported_extensions=.md,.txt,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx
+
+# Ignore patterns (files/folders to skip)
+ignore_patterns=.DS_Store,.git,node_modules,.obsidian,*.tmp,*.log
+
+# ============================================================================
+# CONTENT ANALYSIS
+# ============================================================================
+
+# Enable AI-powered content analysis
+enable_ai_analysis=true
+
+# Content analysis depth
+# Options: basic, standard, comprehensive
+analysis_depth=standard
+
+# Language detection
+detect_language=true
+
+# Extract keywords
+extract_keywords=true
+
+# Analyze document structure
+analyze_structure=true
+
+# ============================================================================
+# DUPLICATE DETECTION
+# ============================================================================
+
+# Enable duplicate detection
+enable_duplicate_detection=true
+
+# Similarity threshold (0.0 to 1.0)
+similarity_threshold=0.8
+
+# Hash-based duplicate detection
+use_hash_detection=true
+
+# Content-based duplicate detection
+use_content_detection=true
+
+# ============================================================================
+# PERFORMANCE SETTINGS
+# ============================================================================
+
+# Enable parallel processing
+parallel_processing=false
+
+# Number of worker threads (0 = auto-detect)
+worker_threads=0
+
+# Batch processing size
+batch_size=50
+
+# Processing timeout (seconds)
+processing_timeout=300
+
+# ============================================================================
+# LOGGING AND MONITORING
+# ============================================================================
+
+# Log level (DEBUG, INFO, WARN, ERROR)
+log_level=INFO
+
+# Enable verbose logging
+verbose_logging=false
+
+# Log file rotation
+log_rotation=true
+
+# Maximum log file size (MB)
+max_log_size=10
+
+# Log retention days
+log_retention_days=30
+
+# ============================================================================
+# BACKUP AND SAFETY
+# ============================================================================
+
+# Enable backups before operations
+enable_backups=true
+
+# Backup directory
+backup_dir=${sync_hub}/Backups
+
+# Backup retention days
+backup_retention_days=7
+
+# Maximum backup size (MB)
+max_backup_size=100
+
+# ============================================================================
+# NOTIFICATION SETTINGS
+# ============================================================================
+
+# Enable system notifications
+enable_notifications=true
+
+# Notify on organization complete
+notify_on_complete=true
+
+# Notify on errors
+notify_on_error=true
+
+# Notify on duplicate detection
+notify_on_duplicates=true
+
+# ============================================================================
+# ADVANCED SETTINGS
+# ============================================================================
+
+# Dry run mode (preview changes without applying)
+dry_run=false
+
+# Debug mode
+debug_mode=false
+
+# Experimental features
+enable_experimental=false
+
+# Custom rules file
+custom_rules_file=${sync_hub}/custom_rules.json
+
+# ============================================================================
+# USER CUSTOMIZATIONS
+# ============================================================================
+
+# Add your custom settings below this line
+# Example:
+# custom_category_rules=true
+# special_processing=enabled
