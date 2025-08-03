@@ -220,4 +220,227 @@ id_ed25519
 logs
 ~/.unison
 ~/
+# Enhanced Document Organization System - .gitignore
+# Excludes sensitive files and folders from public repository
+
+# ============================================================================
+# GIT INTERNAL FILES (CRITICAL - PREVENTS REPOSITORY CORRUPTION)
+# ============================================================================
+
+# Git internal directory - should never be tracked
+.git/
+.git/*
+
+# ============================================================================
+# SENSITIVE CONFIGURATION FILES
+# ============================================================================
+
+# Environment configuration with personal paths and settings
+config/config.env
+
+# Unison sync profiles with personal paths
+config/unison_icloud.prf
+config/unison_google_drive.prf
+
+# LaunchAgent plist files with personal paths
+config/com.moatasim.enhanced-document-organization.plist
+
+# Personal organize configuration
+config/organize_config.conf
+
+# ============================================================================
+# LOGS AND RUNTIME DATA
+# ============================================================================
+
+# All log files and directories
+logs/
+*.log
+*.log.*
+
+# Runtime data and temporary files
+*.pid
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# ============================================================================
+# NODE.JS AND DEPENDENCIES
+# ============================================================================
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Package manager lock files (optional - uncomment if you want to exclude)
+# package-lock.json
+# yarn.lock
+
+# ============================================================================
+# SYSTEM AND IDE FILES
+# ============================================================================
+
+# macOS system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+.TemporaryItems
+.localized
+
+# Windows system files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux system files
+*~
+.directory
+
+# IDE and editor files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.atom/
+.brackets.json
+
+# Vim files
+*.swp
+*.swo
+*~
+.netrwhist
+
+# ============================================================================
+# SYNC AND CLOUD SERVICE FILES
+# ============================================================================
+
+# Cloud service sync files
+*.icloud
+.com.apple.timemachine.donotpresent
+.dropbox
+.dropbox.attr
+.dropbox.cache
+.sync*
+
+# Unison backup files
+*.unison.tmp
+*.unison.bak
+
+# ============================================================================
+# APPLICATION-SPECIFIC EXCLUSIONS
+# ============================================================================
+
+# Obsidian configuration (if synced accidentally)
+.obsidian/
+plugins/
+.obsidian.vimrc
+workspace.json
+app.json
+hotkeys.json
+appearance.json
+community-plugins.json
+core-plugins.json
+core-plugins-migration.json
+
+# Cache directories
+.cache/
+.npm/
+.local/
+.codeium/
+
+# ============================================================================
+# PERSONAL DATA AND DOCUMENTS
+# ============================================================================
+
+# Personal sync directories (if accidentally placed in project)
+Sync_Hub_New/
+Sync_Hub/
+Documents/
+Downloads/
+
+# Personal files that might be accidentally copied
+*.personal
+*.private
+*.secret
+
+# ============================================================================
+# BUILD AND DISTRIBUTION
+# ============================================================================
+
+# Build outputs
+build/
+dist/
+out/
+
+# Coverage reports
+coverage/
+.nyc_output/
+
+# ============================================================================
+# TESTING AND DEVELOPMENT
+# ============================================================================
+
+# Test outputs
+test-results/
+test-reports/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ============================================================================
+# BACKUP AND TEMPORARY DIRECTORIES
+# ============================================================================
+
+# Backup directories
+backup/
+backups/
+*.backup
+*.bak
+
+# Temporary directories created by scripts
+temp/
+tmp/
+.tmp/
+
+# ============================================================================
+# SECURITY AND CREDENTIALS
+# ============================================================================
+
+# Any credential files
+credentials.json
+auth.json
+*.key
+*.pem
+*.p12
+*.pfx
+
+# SSH keys (if accidentally placed)
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+*.pub
+
+# ============================================================================
+# CUSTOM EXCLUSIONS
+# ============================================================================
+
+# Add any project-specific files to exclude below this line
+# Example:
+# my-personal-notes.md
+# local-testing-data/
+logs
+~/.unison
+~/
 .*
+/Users/moatasimfarooque/Downloads/Programming/CascadeProjects/Drive_sync/.gitignore
