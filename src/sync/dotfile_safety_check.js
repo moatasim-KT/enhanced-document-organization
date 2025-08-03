@@ -24,11 +24,12 @@ const ALLOWED_DOTFILES = ['.obsidian', '.attachments']; // Whitelisted dotfiles/
  * @returns {string} - Command to execute
  */
 function getUnisonCheckCommand(profileName) {
-    return `unison ${profileName} -batch -auto -itemize`;
+    // Use dry-run to see what would be synced without actually syncing
+    return `unison ${profileName} -batch -auto -prefer newer -times`;
 }
 
 /**
- * Parse the output of Unison itemize command to detect dotfiles that would be synced
+ * Parse the output of Unison command to detect dotfiles that would be synced
  * @param {string} output - Output from Unison command
  * @returns {Array<{path: string, action: string}>} - Array of dotfiles that would be synced
  */
@@ -36,19 +37,43 @@ function detectDotfiles(output) {
     const lines = output.split('\n');
     const dotfiles = [];
     
+    // Parse Unison output to detect files that would be synced
     for (const line of lines) {
-        // Itemize format looks like: <action> <path>
-        const match = line.match(/^(.*?)\s+(.*)$/);
-        if (!match) continue;
+        const trimmedLine = line.trim();
+        if (!trimmedLine) continue;
         
-        const [, action, itemPath] = match;
+        // Look for file paths in the output
+        // Unison output typically shows files being synced
+        const pathMatch = trimmedLine.match(/(?:new file|changed|deleted|copied).*?([^\s]+)$/) || 
+                         trimmedLine.match(/^([^\s]+)\s+/) ||
+                         trimmedLine.match(/\s+([^\s]+)$/);
         
-        // Check if it's a dotfile or in a dotfile directory
-        if (isPathDotfile(itemPath) && !isWhitelistedDotfile(itemPath)) {
-            dotfiles.push({
-                path: itemPath,
-                action: action
-            });
+        if (pathMatch) {
+            const filePath = pathMatch[1];
+            
+            // Check if it's a dotfile or in a dotfile directory
+            if (isPathDotfile(filePath) && !isWhitelistedDotfile(filePath)) {
+                dotfiles.push({
+                    path: filePath,
+                    action: 'would sync'
+                });
+            }
+        }
+        
+        // Also check for any line that mentions dotfiles directly
+        if (trimmedLine.includes('.') && !trimmedLine.includes('..')) {
+            const words = trimmedLine.split(/\s+/);
+            for (const word of words) {
+                if (isPathDotfile(word) && !isWhitelistedDotfile(word) && word.length > 2) {
+                    // Avoid duplicates
+                    if (!dotfiles.some(d => d.path === word)) {
+                        dotfiles.push({
+                            path: word,
+                            action: 'detected in output'
+                        });
+                    }
+                }
+            }
         }
     }
     

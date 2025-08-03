@@ -276,7 +276,7 @@ pre_sync_validation() {
     if [[ "$skip_safety" != "true" ]]; then
         log "INFO" "Running dotfile safety check for profile: $profile"
         
-        local safety_check_script="$SCRIPT_DIR/dotfile_safety_check.cjs"
+        local safety_check_script="$SCRIPT_DIR/dotfile_safety_check.js"
         if [[ ! -f "$safety_check_script" ]]; then
             log "ERROR" "Dotfile safety check script not found: $safety_check_script"
             return 1

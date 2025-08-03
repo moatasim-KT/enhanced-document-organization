@@ -1963,12 +1963,12 @@ get_file_category_enhanced() {
     
     # Check if advanced modules are available
     if ! check_advanced_module_availability "batch_processor.js"; then
-        log "INFO" "Advanced categorization unavailable, using simple categorization for: $(basename "$file")"
+        log "INFO" "Advanced categorization unavailable, using simple categorization for: $(basename "$file")" >&2
         use_advanced=false
     fi
     
     if [[ "$use_advanced" == "true" ]]; then
-        log "DEBUG" "Attempting enhanced categorization for: $(basename "$file")"
+        log "DEBUG" "Attempting enhanced categorization for: $(basename "$file")" >&2
         
         # Try enhanced categorization with retry and error handling
         if category=$(run_with_retry 2 1 30 "
@@ -1980,19 +1980,19 @@ get_file_category_enhanced() {
             
             # Validate the category result
             if [[ -n "$category" && "$category" != "null" && "$category" != "undefined" ]]; then
-                log "DEBUG" "✓ Enhanced categorization successful: $(basename "$file") -> $category"
+                log "DEBUG" "✓ Enhanced categorization successful: $(basename "$file") -> $category" >&2
                 echo "$category"
                 return 0
             else
-                log "DEBUG" "Enhanced categorization returned invalid result, falling back"
+                log "DEBUG" "Enhanced categorization returned invalid result, falling back" >&2
             fi
         else
-            log "DEBUG" "Enhanced categorization failed, falling back to simple method"
+            log "DEBUG" "Enhanced categorization failed, falling back to simple method" >&2
         fi
     fi
     
     # Fallback to simple categorization with logging
-    log "DEBUG" "Using simple categorization for: $(basename "$file")"
+    log "DEBUG" "Using simple categorization for: $(basename "$file")" >&2
     category=$(get_file_category_simple "$file")
     
     # Ensure we always return a valid category
@@ -2002,7 +2002,9 @@ get_file_category_enhanced() {
 # Check if advanced modules are available and functional
 check_advanced_module_availability() {
     local module_name="$1"
-    local check_cache_key="module_available_${module_name}"
+    # Sanitize module name for use as shell variable (remove dots and special chars)
+    local sanitized_name=$(echo "$module_name" | sed 's/[^a-zA-Z0-9_]/_/g')
+    local check_cache_key="module_available_${sanitized_name}"
     
     # Use a simple cache to avoid repeated checks (valid for this script execution)
     if [[ -n "${!check_cache_key:-}" ]]; then
@@ -2017,14 +2019,14 @@ check_advanced_module_availability() {
     local module_path
     if ! module_path=$(resolve_module_path "$module_name" 2>/dev/null); then
         log "DEBUG" "Module not found: $module_name"
-        declare -g "$check_cache_key"="false"
+        eval "$check_cache_key=false"
         return 1
     fi
     
     # Check if Node.js is available
     if ! command -v node >/dev/null 2>&1; then
         log "DEBUG" "Node.js not available, cannot use advanced modules"
-        declare -g "$check_cache_key"="false"
+        eval "$check_cache_key=false"
         return 1
     fi
     
@@ -2040,11 +2042,11 @@ check_advanced_module_availability() {
         }
     " 2>/dev/null); then
         log "DEBUG" "✓ Advanced module is available and functional: $module_name"
-        declare -g "$check_cache_key"="true"
+        eval "$check_cache_key=true"
         return 0
     else
         log "DEBUG" "✗ Advanced module failed functionality test: $module_name"
-        declare -g "$check_cache_key"="false"
+        eval "$check_cache_key=false"
         return 1
     fi
 }
